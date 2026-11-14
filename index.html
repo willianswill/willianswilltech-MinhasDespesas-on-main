@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minhas Despesas | Gestão Financeira & Meta Diária</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Topbar -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Minhas Despesas</h1>
+          <p id="current-date-badge" class="date-subtitle">Carregando data...</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-export" class="btn btn-outline" title="Fazer backup em arquivo JSON">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          Exportar
+        </button>
+        <button id="btn-open-modal" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Nova Despesa
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Grid -->
+    <main class="app-content">
+      <!-- Target Highlight Card -->
+      <section class="target-banner">
+        <div class="target-info">
+          <div class="target-pill">
+            <span class="pulse-dot"></span>
+            CÁLCULO ATUALIZADO DIA A DIA
+          </div>
+          <h2>Quanto você precisa ganhar por dia:</h2>
+          <div class="target-amount-wrapper">
+            <span class="target-currency">R$</span>
+            <span id="daily-target-value" class="target-amount">0,00</span>
+            <span class="target-period">/ dia</span>
+          </div>
+          <p id="target-explanation" class="target-detail">
+            Calculando com base nas pendências e nos dias restantes do mês...
+          </p>
+        </div>
+
+        <div class="target-controls">
+          <label for="days-mode-select">Calcular considerando:</label>
+          <div class="select-wrapper">
+            <select id="days-mode-select">
+              <option value="all">Todos os dias restantes (Corridos)</option>
+              <option value="business">Apenas dias úteis (Seg a Sex)</option>
+              <option value="business_sat">Dias úteis + Sábados (Seg a Sáb)</option>
+            </select>
+          </div>
+          <div class="days-remaining-badge">
+            <span id="days-left-count">0</span>
+            <small id="days-left-label">dias restantes no mês</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- KPI Summary Cards -->
+      <section class="kpi-grid">
+        <div class="kpi-card total-card">
+          <div class="kpi-header">
+            <span>Total do Mês</span>
+            <div class="kpi-icon icon-blue">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+              </svg>
+            </div>
+          </div>
+          <div id="kpi-total" class="kpi-value">R$ 0,00</div>
+          <div id="kpi-count" class="kpi-sub">0 despesas cadastradas</div>
+        </div>
+
+        <div class="kpi-card paid-card">
+          <div class="kpi-header">
+            <span>Já Quitado</span>
+            <div class="kpi-icon icon-green">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+          </div>
+          <div id="kpi-paid" class="kpi-value text-green">R$ 0,00</div>
+          <div id="kpi-paid-percent" class="kpi-sub">0% das despesas</div>
+        </div>
+
+        <div class="kpi-card pending-card">
+          <div class="kpi-header">
+            <span>Pendente a Pagar</span>
+            <div class="kpi-icon icon-orange">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+          </div>
+          <div id="kpi-pending" class="kpi-value text-orange">R$ 0,00</div>
+          <div id="kpi-pending-sub" class="kpi-sub">Valor a quitar este mês</div>
+        </div>
+      </section>
+
+      <!-- Progress Bar -->
+      <section class="progress-section">
+        <div class="progress-labels">
+          <span>Progresso de Pagamentos do Mês</span>
+          <span id="progress-percentage-label">0% quitado</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+      </section>
+
+      <!-- Filters & Search Toolbar -->
+      <section class="filters-card">
+        <div class="search-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="filter-search" placeholder="Buscar por nome ou observação..." />
+        </div>
+
+        <div class="filter-controls-group">
+          <!-- Filtro Status -->
+          <div class="filter-item">
+            <label for="filter-status">Status</label>
+            <select id="filter-status">
+              <option value="all">Todos os status</option>
+              <option value="pending">Apenas Pendentes</option>
+              <option value="paid">Apenas Pagas</option>
+            </select>
+          </div>
+
+          <!-- Filtro Categoria -->
+          <div class="filter-item">
+            <label for="filter-category">Categoria</label>
+            <select id="filter-category">
+              <option value="all">Todas as categorias</option>
+              <option value="Moradia">🏠 Moradia (Aluguel, Condomínio)</option>
+              <option value="Contas">💡 Contas (Luz, Água, Internet)</option>
+              <option value="Alimentação">🛒 Alimentação</option>
+              <option value="Transporte">🚗 Transporte / Combustível</option>
+              <option value="Saúde">💊 Saúde & Farmácia</option>
+              <option value="Educação">📚 Educação & Cursos</option>
+              <option value="Assinaturas">📱 Assinaturas & Streaming</option>
+              <option value="Lazer">🎉 Lazer</option>
+              <option value="Cartão/Empréstimo">💳 Cartão / Empréstimo</option>
+              <option value="Outros">📦 Outros</option>
+            </select>
+          </div>
+
+          <!-- Filtro Tipo -->
+          <div class="filter-item">
+            <label for="filter-type">Tipo</label>
+            <select id="filter-type">
+              <option value="all">Todos os tipos</option>
+              <option value="Fixa">Fixa</option>
+              <option value="Recorrente">Recorrente</option>
+              <option value="Variável">Variável</option>
+            </select>
+          </div>
+
+          <!-- Ordenação -->
+          <div class="filter-item">
+            <label for="sort-order">Ordenar por</label>
+            <select id="sort-order">
+              <option value="due_asc">Vencimento (Mais próximo)</option>
+              <option value="due_desc">Vencimento (Mais distante)</option>
+              <option value="val_desc">Maior Valor</option>
+              <option value="val_asc">Menor Valor</option>
+              <option value="name_asc">Nome (A - Z)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Expense List Table / Card Section -->
+      <section class="expenses-container">
+        <div class="section-header">
+          <h3>Suas Despesas (<span id="visible-count">0</span>)</h3>
+          <div class="list-quick-actions">
+            <button id="btn-quick-sample" class="btn-text">Inserir exemplos para testar</button>
+            <button id="btn-clear-all" class="btn-text text-danger">Limpar tudo</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="expenses-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">Status</th>
+                <th>Descrição</th>
+                <th>Categoria</th>
+                <th>Tipo</th>
+                <th>Vencimento</th>
+                <th>Valor</th>
+                <th style="text-align: right; width: 120px;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="expenses-tbody">
+              <!-- Renderizado via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty state placeholder -->
+        <div id="empty-state" class="empty-state" style="display: none;">
+          <div class="empty-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+              <path d="M7 15h0M2 10h20"></path>
+            </svg>
+          </div>
+          <h4>Nenhuma despesa encontrada</h4>
+          <p>Você não cadastrou despesas ainda ou os filtros atuais não retornaram nenhum item.</p>
+          <button class="btn btn-primary" onclick="openExpenseModal()">Adicionar Primeira Despesa</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal Nova / Editar Despesa -->
+  <div id="expense-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-title">Nova Despesa</h3>
+        <button id="modal-close-btn" class="modal-close">&times;</button>
+      </div>
+      <form id="expense-form">
+        <input type="hidden" id="form-id" />
+
+        <div class="form-group">
+          <label for="form-name">Nome / Descrição *</label>
+          <input type="text" id="form-name" required placeholder="Ex: Aluguel, Internet, Cartão Nubank..." />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="form-value">Valor (R$) *</label>
+            <input type="number" id="form-value" step="0.01" min="0.01" required placeholder="0,00" />
+          </div>
+
+          <div class="form-group">
+            <label for="form-day">Dia do Vencimento *</label>
+            <input type="number" id="form-day" min="1" max="31" required placeholder="Ex: 10" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="form-category">Categoria *</label>
+            <select id="form-category" required>
+              <option value="Moradia">🏠 Moradia</option>
+              <option value="Contas">💡 Contas e Boletos</option>
+              <option value="Alimentação">🛒 Alimentação</option>
+              <option value="Transporte">🚗 Transporte</option>
+              <option value="Saúde">💊 Saúde</option>
+              <option value="Educação">📚 Educação</option>
+              <option value="Assinaturas">📱 Assinaturas / Apps</option>
+              <option value="Lazer">🎉 Lazer</option>
+              <option value="Cartão/Empréstimo">💳 Cartão / Empréstimo</option>
+              <option value="Outros">📦 Outros</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="form-type">Tipo de Despesa *</label>
+            <select id="form-type" required>
+              <option value="Fixa">Fixa (valor sempre igual)</option>
+              <option value="Recorrente">Recorrente (todo mês varia um pouco)</option>
+              <option value="Variável">Variável / Esporádica</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="form-status">Situação de Pagamento</label>
+          <select id="form-status">
+            <option value="pending">Pendente (A Pagar)</option>
+            <option value="paid">Paga (Já Quitado)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="form-obs">Observações (opcional)</label>
+          <input type="text" id="form-obs" placeholder="Ex: Débito automático, parcelado 3/10..." />
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="btn-cancel-modal" class="btn btn-secondary">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-expense">Salvar Despesa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
