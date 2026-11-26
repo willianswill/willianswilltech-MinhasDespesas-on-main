@@ -82,6 +82,16 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
     private var pendingSeekTargetMs = -1L
     private var progressiveSeekDeltaMs = 0L
     private var seekLockUntilMs = 0L
+    private val commitSeekRunnable = Runnable {
+        if (pendingSeekTargetMs >= 0L) {
+            seekLockUntilMs = System.currentTimeMillis() + 2000L
+            player?.seekTo(pendingSeekTargetMs)
+            pendingSeekTargetMs = -1L
+            progressiveSeekDeltaMs = 0L
+            handler.removeCallbacks(hideGestureRunnable)
+            handler.postDelayed(hideGestureRunnable, 1200L)
+        }
+    }
     private var saveTickCount = 0
     private var heartbeatTickCount = 0
     private val autoNextRunnable = Runnable {
@@ -964,7 +974,50 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         if (event.action == KeyEvent.ACTION_DOWN && binding.controlsOverlay.visibility == View.VISIBLE) {
             scheduleHideControls()
         }
+        val isDpadHoriz = event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+        if (isDpadHoriz &&
+            isVodPlayback() &&
+            binding.vodQuickPanel.visibility != View.VISIBLE &&
+            binding.channelDrawer.visibility != View.VISIBLE &&
+            (binding.controlsOverlay.visibility != View.VISIBLE || binding.seekBar.hasFocus())
+        ) {
+            if (handleVodDpadSeek(event)) return true
+        }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun handleVodDpadSeek(event: KeyEvent): Boolean {
+        val exo = player ?: return true
+        if (exo.duration <= 0L) return true
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            handler.removeCallbacks(commitSeekRunnable)
+            val isRight = event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+            val stepMs = when {
+                event.repeatCount == 0 -> 10_000L
+                event.repeatCount <= 4 -> 30_000L
+                event.repeatCount <= 10 -> 60_000L
+                else -> 120_000L
+            }
+            val signedStep = if (isRight) stepMs else -stepMs
+            val basePos = if (pendingSeekTargetMs >= 0L) pendingSeekTargetMs else exo.currentPosition
+            val target = (basePos + signedStep).coerceIn(0L, exo.duration)
+            progressiveSeekDeltaMs += signedStep
+            pendingSeekTargetMs = target
+            updateSeekUiImmediate(target, exo.duration)
+            showControls(focusSeekBar = true)
+            val deltaSec = progressiveSeekDeltaMs / 1000L
+            val arrow = if (deltaSec >= 0) "⏩ +${deltaSec}s" else "⏪ ${deltaSec}s"
+            binding.tvGestureFeedback.text = "$arrow  •  ${formatDuration(target)}"
+            binding.tvGestureFeedback.visibility = View.VISIBLE
+            handler.removeCallbacks(hideGestureRunnable)
+            return true
+        }
+        if (event.action == KeyEvent.ACTION_UP && pendingSeekTargetMs >= 0L) {
+            handler.removeCallbacks(commitSeekRunnable)
+            handler.postDelayed(commitSeekRunnable, 350L)
+            return true
+        }
+        return false
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -1004,28 +1057,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
                 }
             }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (vod && (binding.controlsOverlay.visibility != View.VISIBLE || binding.seekBar.hasFocus())) {
-                    val exo = player ?: return true
-                    if (exo.duration <= 0L) return true
-                    val isRight = keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-                    val stepMs = when {
-                        repeatCount == 0 -> 10_000L
-                        repeatCount <= 4 -> 30_000L
-                        repeatCount <= 10 -> 60_000L
-                        else -> 120_000L
-                    }
-                    progressiveSeekDeltaMs += if (isRight) stepMs else -stepMs
-                    val target = (exo.currentPosition + progressiveSeekDeltaMs).coerceIn(0L, exo.duration)
-                    pendingSeekTargetMs = target
-                    updateSeekUiImmediate(target, exo.duration)
-                    showControls(focusSeekBar = true)
-                    val deltaSec = progressiveSeekDeltaMs / 1000L
-                    val arrow = if (deltaSec >= 0) "⏩ +${deltaSec}s" else "⏪ ${deltaSec}s"
-                    binding.tvGestureFeedback.text = "$arrow  •  ${formatDuration(target)}"
-                    binding.tvGestureFeedback.visibility = View.VISIBLE
-                    handler.removeCallbacks(hideGestureRunnable)
-                    true
-                } else if (!vod && binding.controlsOverlay.visibility != View.VISIBLE) {
+                if (!vod && binding.controlsOverlay.visibility != View.VISIBLE) {
                     zap(if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1)
                     true
                 } else {
@@ -1086,17 +1118,6 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        if ((keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) &&
-            pendingSeekTargetMs >= 0L
-        ) {
-            seekLockUntilMs = System.currentTimeMillis() + 1800L
-            player?.seekTo(pendingSeekTargetMs)
-            pendingSeekTargetMs = -1L
-            progressiveSeekDeltaMs = 0L
-            handler.removeCallbacks(hideGestureRunnable)
-            handler.postDelayed(hideGestureRunnable, 1200L)
-            return true
-        }
         return super.onKeyUp(keyCode, event)
     }
 
