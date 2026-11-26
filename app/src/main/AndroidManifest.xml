@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Suporte para TV Box / Android TV e Celulares no mesmo APK -->
+    <!-- Híbrido: TV Box (Android TV / Leanback) + Smartphones/Tablets -->
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="false" />
@@ -22,13 +22,13 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MinhasTV"
+        android:theme="@style/Theme.NovaTV"
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
 
         <activity
-            android:name=".ui.MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:name=".feature.home.HomeActivity"
+            android:configChanges="screenSize|screenLayout|orientation|keyboardHidden"
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>
@@ -39,11 +39,35 @@
         </activity>
 
         <activity
-            android:name=".ui.PlayerActivity"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:name=".feature.playlists.PlaylistsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".feature.livetv.LiveTvActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".feature.vod.VodCatalogActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".feature.settings.SettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".core.player.PlayerActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="sensorLandscape"
+            android:supportsPictureInPicture="true"
+            android:theme="@style/Theme.NovaTV.Player" />
+
+        <activity
+            android:name=".core.player.MultiViewActivity"
+            android:configChanges="screenSize|screenLayout|orientation|keyboardHidden"
             android:exported="false"
             android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.MinhasTV.Player" />
-
+            android:theme="@style/Theme.NovaTV.Player" />
     </application>
 </manifest>

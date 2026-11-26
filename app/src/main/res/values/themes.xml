@@ -1,13 +1,13 @@
 <resources>
-    <style name="Theme.MinhasTV" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="colorPrimary">@color/accent_blue</item>
+    <style name="Theme.NovaTV" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/accent_primary</item>
         <item name="colorSecondary">@color/accent_cyan</item>
-        <item name="android:windowBackground">@color/bg_primary</item>
-        <item name="android:statusBarColor">@color/bg_primary</item>
-        <item name="android:navigationBarColor">@color/bg_primary</item>
+        <item name="android:windowBackground">@color/bg_cinema</item>
+        <item name="android:statusBarColor">@color/bg_cinema</item>
+        <item name="android:navigationBarColor">@color/bg_cinema</item>
     </style>
 
-    <style name="Theme.MinhasTV.Player" parent="Theme.MinhasTV">
+    <style name="Theme.NovaTV.Player" parent="Theme.NovaTV">
         <item name="android:windowBackground">#000000</item>
         <item name="android:windowFullscreen">true</item>
     </style>

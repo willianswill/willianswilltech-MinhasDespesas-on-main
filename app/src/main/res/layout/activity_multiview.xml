@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:keepScreenOn="true"
+    android:orientation="vertical"
+    android:padding="6dp">
+
+    <!-- Multi-View Top Controls -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
+        android:paddingBottom="6dp">
+
+        <Button
+            android:id="@+id/btn_mv_back"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:background="@drawable/selector_player_btn"
+            android:focusable="true"
+            android:paddingHorizontal="10dp"
+            android:text="◀ Sair Multi-View"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tv_mv_info"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="Toque ou selecione uma tela para ativar o áudio"
+            android:textColor="#94A3B8"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btn_mv_swap_channel"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/selector_player_btn"
+            android:focusable="true"
+            android:paddingHorizontal="10dp"
+            android:text="⇄ Trocar Canal"
+            android:textColor="#38BDF8"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btn_mv_toggle_grid"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:background="@drawable/selector_player_btn"
+            android:focusable="true"
+            android:paddingHorizontal="10dp"
+            android:text="2 / 4 Telas"
+            android:textColor="#34D399"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Row 1 (Slots 0 and 1) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:id="@+id/slot_0"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_margin="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/selector_multiview_slot"
+            android:focusable="true"
+            android:padding="2dp">
+
+            <androidx.media3.ui.PlayerView
+                android:id="@+id/pv_0"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:resize_mode="fit"
+                app:use_controller="false" />
+
+            <TextView
+                android:id="@+id/tv_slot_0"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="6dp"
+                android:background="#AA000000"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:text="Tela 1"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/slot_1"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_margin="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/selector_multiview_slot"
+            android:focusable="true"
+            android:padding="2dp">
+
+            <androidx.media3.ui.PlayerView
+                android:id="@+id/pv_1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:resize_mode="fit"
+                app:use_controller="false" />
+
+            <TextView
+                android:id="@+id/tv_slot_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="6dp"
+                android:background="#AA000000"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:text="Tela 2"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Row 2 (Slots 2 and 3) -->
+    <LinearLayout
+        android:id="@+id/row_2"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:visibility="visible">
+
+        <FrameLayout
+            android:id="@+id/slot_2"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_margin="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/selector_multiview_slot"
+            android:focusable="true"
+            android:padding="2dp">
+
+            <androidx.media3.ui.PlayerView
+                android:id="@+id/pv_2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:resize_mode="fit"
+                app:use_controller="false" />
+
+            <TextView
+                android:id="@+id/tv_slot_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="6dp"
+                android:background="#AA000000"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:text="Tela 3"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/slot_3"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_margin="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/selector_multiview_slot"
+            android:focusable="true"
+            android:padding="2dp">
+
+            <androidx.media3.ui.PlayerView
+                android:id="@+id/pv_3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:resize_mode="fit"
+                app:use_controller="false" />
+
+            <TextView
+                android:id="@+id/tv_slot_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="6dp"
+                android:background="#AA000000"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:text="Tela 4"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp" />
+        </FrameLayout>
+    </LinearLayout>
+
+</LinearLayout>

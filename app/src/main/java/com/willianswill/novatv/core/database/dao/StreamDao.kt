@@ -1,0 +1,70 @@
+package com.willianswill.novatv.core.database.dao
+
+import androidx.paging.PagingSource
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.willianswill.novatv.core.database.entity.StreamEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface StreamDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(streams: List<StreamEntity>)
+
+    @Query(
+        """
+        SELECT * FROM streams
+        WHERE profileId = :profileId
+          AND mediaType = :mediaType
+          AND (:categoryId IS NULL OR categoryId = :categoryId)
+          AND (:onlyFavorites = 0 OR isFavorite = 1)
+          AND (:includeAdult = 1 OR isAdult = 0)
+          AND (:query = '' OR name LIKE '%' || :query || '%')
+        ORDER BY id ASC
+        """
+    )
+    fun pagingSource(
+        profileId: Long,
+        mediaType: String,
+        categoryId: String?,
+        onlyFavorites: Boolean,
+        includeAdult: Boolean,
+        query: String
+    ): PagingSource<Int, StreamEntity>
+
+    @Query(
+        """
+        SELECT * FROM streams
+        WHERE profileId = :profileId AND isFavorite = 1
+          AND (:includeAdult = 1 OR isAdult = 0)
+        ORDER BY name ASC
+        LIMIT :limit
+        """
+    )
+    fun observeFavorites(profileId: Long, includeAdult: Boolean, limit: Int = 40): Flow<List<StreamEntity>>
+
+    @Query(
+        """
+        SELECT * FROM streams
+        WHERE profileId = :profileId AND mediaType = :mediaType
+          AND (:includeAdult = 1 OR isAdult = 0)
+        ORDER BY addedAt DESC, id DESC
+        LIMIT :limit
+        """
+    )
+    fun observeRecentlyAdded(profileId: Long, mediaType: String, includeAdult: Boolean, limit: Int = 30): Flow<List<StreamEntity>>
+
+    @Query("SELECT streamUrl FROM streams WHERE profileId = :profileId AND isFavorite = 1")
+    suspend fun getFavoriteUrls(profileId: Long): List<String>
+
+    @Query("UPDATE streams SET isFavorite = :isFavorite WHERE id = :id")
+    suspend fun updateFavorite(id: Long, isFavorite: Boolean)
+
+    @Query("SELECT COUNT(*) FROM streams WHERE profileId = :profileId AND mediaType = :mediaType")
+    suspend fun countByType(profileId: Long, mediaType: String): Int
+
+    @Query("DELETE FROM streams WHERE profileId = :profileId")
+    suspend fun deleteByProfile(profileId: Long)
+}

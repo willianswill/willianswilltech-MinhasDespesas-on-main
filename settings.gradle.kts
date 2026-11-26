@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MinhasTV_IPTV"
+rootProject.name = "NovaTV_IPTV"
 include(":app")

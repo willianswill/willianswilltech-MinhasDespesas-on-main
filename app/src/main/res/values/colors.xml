@@ -1,10 +1,18 @@
 <resources>
-    <color name="bg_primary">#0B0F19</color>
-    <color name="bg_surface">#131B2E</color>
-    <color name="bg_card">#1A243D</color>
-    <color name="accent_blue">#3B82F6</color>
+    <!-- Cinematic Dark Mode (Apple TV + Netflix inspired) -->
+    <color name="bg_cinema">#07090F</color>
+    <color name="bg_surface">#101522</color>
+    <color name="bg_elevated">#182033</color>
+    <color name="border_subtle">#24304A</color>
+
+    <color name="accent_primary">#3B82F6</color>
     <color name="accent_cyan">#38BDF8</color>
+    <color name="accent_gold">#FBBF24</color>
+    <color name="accent_emerald">#10B981</color>
+    <color name="accent_danger">#EF4444</color>
+
     <color name="text_primary">#F8FAFC</color>
     <color name="text_secondary">#94A3B8</color>
-    <color name="ic_launcher_background">#0F172A</color>
+    <color name="text_muted">#64748B</color>
+    <color name="ic_launcher_background">#07090F</color>
 </resources>

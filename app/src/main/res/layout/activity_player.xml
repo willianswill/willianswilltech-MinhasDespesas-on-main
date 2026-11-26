@@ -15,13 +15,13 @@
         app:show_buffering="never"
         app:use_controller="false" />
 
-    <!-- Loading / Reconnecting Indicator -->
+    <!-- Loading / Reconnecting Pill -->
     <LinearLayout
         android:id="@+id/loading_overlay"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/bg_pill_dark"
+        android:background="@drawable/bg_player_pill"
         android:gravity="center"
         android:orientation="horizontal"
         android:paddingHorizontal="20dp"
@@ -29,8 +29,8 @@
         android:visibility="gone">
 
         <ProgressBar
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:indeterminateTint="#38BDF8" />
 
         <TextView
@@ -38,13 +38,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
-            android:text="Carregando canal..."
+            android:text="Carregando..."
             android:textColor="#F8FAFC"
             android:textSize="14sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Custom Touch + D-Pad OSD Controls Overlay -->
+    <!-- OSD Controls Overlay -->
     <RelativeLayout
         android:id="@+id/controls_overlay"
         android:layout_width="match_parent"
@@ -62,16 +62,16 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <ImageButton
+            <Button
                 android:id="@+id/btn_back"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@drawable/selector_focus_circle"
-                android:contentDescription="Voltar"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/selector_player_btn"
                 android:focusable="true"
-                android:padding="10dp"
-                android:src="@drawable/ic_back"
-                app:tint="#FFFFFF" />
+                android:paddingHorizontal="12dp"
+                android:text="◀ Voltar"
+                android:textColor="#FFFFFF" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -81,37 +81,62 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/tv_channel_title"
+                    android:id="@+id/tv_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="Nome do Canal"
+                    android:text="Título"
                     android:textColor="#FFFFFF"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/tv_channel_group"
+                    android:id="@+id/tv_subtitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="Categoria"
+                    android:text="Subtítulo / EPG"
                     android:textColor="#94A3B8"
                     android:textSize="13sp" />
             </LinearLayout>
 
-            <ImageButton
-                android:id="@+id/btn_favorite"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@drawable/selector_focus_circle"
-                android:contentDescription="Favoritar"
+            <Button
+                android:id="@+id/btn_catchup"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/selector_player_btn"
                 android:focusable="true"
-                android:padding="10dp"
-                android:src="@drawable/ic_star_outline"
-                app:tint="#FBBF24" />
+                android:paddingHorizontal="12dp"
+                android:text="↺ Catch-up"
+                android:textColor="#FBBF24"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btn_multiview"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/selector_player_btn"
+                android:focusable="true"
+                android:paddingHorizontal="12dp"
+                android:text="⊞ Multi-View"
+                android:textColor="#38BDF8" />
+
+            <Button
+                android:id="@+id/btn_pip"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/selector_player_btn"
+                android:focusable="true"
+                android:paddingHorizontal="12dp"
+                android:text="❐ PiP"
+                android:textColor="#FFFFFF" />
         </LinearLayout>
 
         <!-- Bottom Bar -->
@@ -120,77 +145,128 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
-            android:background="@drawable/bg_pill_dark"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
+            android:background="@drawable/bg_player_pill"
+            android:orientation="vertical"
             android:paddingHorizontal="16dp"
             android:paddingVertical="10dp">
 
-            <Button
-                android:id="@+id/btn_prev_channel"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
+            <!-- VOD SeekBar Row -->
+            <LinearLayout
+                android:id="@+id/seek_container"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/selector_focus_button"
-                android:focusable="true"
-                android:minHeight="42dp"
-                android:paddingHorizontal="14dp"
-                android:text="◀ Anterior"
-                android:textColor="#F8FAFC" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
 
-            <ImageButton
-                android:id="@+id/btn_play_pause"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginHorizontal="12dp"
-                android:background="@drawable/selector_focus_circle"
-                android:contentDescription="Play ou Pause"
-                android:focusable="true"
-                android:padding="10dp"
-                android:src="@drawable/ic_pause"
-                app:tint="#FFFFFF" />
+                <TextView
+                    android:id="@+id/tv_pos_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:00"
+                    android:textColor="#E2E8F0"
+                    android:textSize="12sp" />
 
-            <Button
-                android:id="@+id/btn_next_channel"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
+                <SeekBar
+                    android:id="@+id/seek_bar"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="8dp"
+                    android:layout_weight="1"
+                    android:progressTint="#38BDF8"
+                    android:thumbTint="#38BDF8" />
+
+                <TextView
+                    android:id="@+id/tv_dur_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:00"
+                    android:textColor="#94A3B8"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Action Buttons Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/selector_focus_button"
-                android:focusable="true"
-                android:minHeight="42dp"
-                android:paddingHorizontal="14dp"
-                android:text="Próximo ▶"
-                android:textColor="#F8FAFC" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <View
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
+                <Button
+                    android:id="@+id/btn_prev"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:background="@drawable/selector_player_btn"
+                    android:focusable="true"
+                    android:paddingHorizontal="12dp"
+                    android:text="⏮ Ant."
+                    android:textColor="#FFFFFF" />
 
-            <Button
-                android:id="@+id/btn_aspect_ratio"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/selector_focus_button"
-                android:focusable="true"
-                android:minHeight="42dp"
-                android:paddingHorizontal="14dp"
-                android:text="Tela: Ajustar"
-                android:textColor="#38BDF8" />
+                <Button
+                    android:id="@+id/btn_play_pause"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginHorizontal="6dp"
+                    android:background="@drawable/selector_player_btn"
+                    android:focusable="true"
+                    android:paddingHorizontal="14dp"
+                    android:text="⏸ Pausar"
+                    android:textColor="#FFFFFF" />
 
-            <Button
-                android:id="@+id/btn_reconnect"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/selector_focus_button"
-                android:focusable="true"
-                android:minHeight="42dp"
-                android:paddingHorizontal="14dp"
-                android:text="↻ Recarregar"
-                android:textColor="#34D399" />
+                <Button
+                    android:id="@+id/btn_next"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:background="@drawable/selector_player_btn"
+                    android:focusable="true"
+                    android:paddingHorizontal="12dp"
+                    android:text="Próx. ⏭"
+                    android:textColor="#FFFFFF" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <Button
+                    android:id="@+id/btn_tracks"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/selector_player_btn"
+                    android:focusable="true"
+                    android:paddingHorizontal="12dp"
+                    android:text="♫ Áudio/Leg."
+                    android:textColor="#F8FAFC" />
+
+                <Button
+                    android:id="@+id/btn_aspect"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/selector_player_btn"
+                    android:focusable="true"
+                    android:paddingHorizontal="12dp"
+                    android:text="Ajustar"
+                    android:textColor="#38BDF8" />
+
+                <Button
+                    android:id="@+id/btn_reload"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:background="@drawable/selector_player_btn"
+                    android:focusable="true"
+                    android:paddingHorizontal="10dp"
+                    android:text="↻"
+                    android:textColor="#34D399" />
+            </LinearLayout>
         </LinearLayout>
 
     </RelativeLayout>

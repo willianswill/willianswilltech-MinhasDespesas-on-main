@@ -5,13 +5,13 @@
             <gradient
                 android:angle="135"
                 android:endColor="#0F2744"
-                android:startColor="#0B0F19" />
+                android:startColor="#07090F" />
             <corners android:radius="8dp" />
         </shape>
     </item>
     <item
         android:width="72dp"
         android:height="72dp"
-        android:drawable="@drawable/ic_tv"
+        android:drawable="@drawable/ic_tv_logo"
         android:gravity="center" />
 </layer-list>
