@@ -49,7 +49,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class PlayerActivity : AppCompatActivity() {
+class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
 
     companion object {
         const val EXTRA_ITEMS = "extra_items"
@@ -1091,6 +1091,10 @@ class PlayerActivity : AppCompatActivity() {
             return true
         }
         return super.onKeyUp(keyCode, event)
+    }
+
+    override fun stopPlaybackForRemoteCommand() {
+        releasePlayer()
     }
 
     private fun releasePlayer() {

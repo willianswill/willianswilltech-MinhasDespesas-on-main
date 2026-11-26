@@ -202,8 +202,13 @@ object TelemetryManager {
             .apply()
     }
 
+    interface PlaybackStopper {
+        fun stopPlaybackForRemoteCommand()
+    }
+
     fun handleCommandOnActivity(activity: Activity, cmd: RemoteCommand, onRetryUnblock: () -> Unit = {}) {
         if (activity.isFinishing || activity.isDestroyed) return
+        (activity as? PlaybackStopper)?.stopPlaybackForRemoteCommand()
         when (cmd.action) {
             "KICK" -> {
                 markKickHandled(activity, cmd.issuedAt)

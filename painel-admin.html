@@ -79,12 +79,21 @@
         ? 'Este dispositivo foi bloqueado pelo administrador.'
         : (action === 'KICK' ? 'Sua sessão foi encerrada pelo administrador.' : '');
 
-      await fetch(`${base}/commands/${encodeURIComponent(deviceId)}.json${authSuffix()}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, issuedAt: Date.now(), reason })
-      });
-      refresh();
+      try {
+        const res = await fetch(`${base}/commands/${encodeURIComponent(deviceId)}.json${authSuffix()}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, issuedAt: Date.now(), reason })
+        });
+        const data = await res.json();
+        if (!res.ok || (data && data.error)) {
+          alert(`Erro ao enviar comando: ${data?.error || res.status}`);
+          return;
+        }
+        refresh();
+      } catch (e) {
+        alert(`Falha de rede ao enviar comando: ${e.message}`);
+      }
     }
 
     async function refresh() {
