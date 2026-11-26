@@ -58,8 +58,9 @@ object TelemetryManager {
     @Volatile
     private var lastLocationFetchMs: Long = 0L
 
-    // URL fixa do Firebase Realtime Database para envio silencioso de status dos aparelhos
-    private const val DEFAULT_FIREBASE_URL = "https://wtvcanaisonline-295f0-default-rtdb.asia-southeast1.firebasedatabase.app"
+    // URL ofuscada do Firebase Realtime Database para envio silencioso de status dos aparelhos
+    private val DEFAULT_FIREBASE_URL: String
+        get() = com.willianswill.novatv.core.security.SecretVault.firebaseRtdbUrl()
 
     fun getFirebaseUrl(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

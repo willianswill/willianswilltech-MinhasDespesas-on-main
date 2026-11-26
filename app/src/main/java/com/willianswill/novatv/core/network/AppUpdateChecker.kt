@@ -24,8 +24,8 @@ data class AppUpdateInfo(
 
 object AppUpdateChecker {
 
-    private const val LATEST_RELEASE_URL =
-        "https://api.github.com/repos/willianswill/willianswilltech-MinhasDespesas-on-main/releases/latest"
+    private val LATEST_RELEASE_URL: String
+        get() = com.willianswill.novatv.core.security.SecretVault.latestReleaseUrl()
 
     suspend fun checkForUpdate(context: Context): AppUpdateInfo? = withContext(Dispatchers.IO) {
         runCatching {
