@@ -1,6 +1,5 @@
 package com.willianswill.novatv.feature.settings
 
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
@@ -12,11 +11,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.ProfileEntity
-import com.willianswill.novatv.core.network.TelemetryManager
 import com.willianswill.novatv.core.player.AppPreferences
 import com.willianswill.novatv.core.player.BufferProfile
 import com.willianswill.novatv.databinding.ActivitySettingsBinding
-import com.willianswill.novatv.feature.admin.ControlPanelActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
@@ -58,7 +55,6 @@ class SettingsActivity : AppCompatActivity() {
         updateBufferButtons(prefs.bufferProfile)
         binding.switchReconnect.isChecked = prefs.autoReconnect
         binding.etUserAgent.setText(prefs.customUserAgent)
-        binding.etFirebaseUrl.setText(TelemetryManager.getFirebaseUrl(this))
         updateAdultLabel()
     }
 
@@ -89,36 +85,6 @@ class SettingsActivity : AppCompatActivity() {
         }
         binding.btnImportBackup.setOnClickListener {
             importLauncher.launch(arrayOf("application/json", "*/*"))
-        }
-
-        binding.btnSaveFirebase.setOnClickListener {
-            val url = binding.etFirebaseUrl.text.toString().trim()
-            TelemetryManager.setFirebaseUrl(this, url)
-            Toast.makeText(this, "URL do Painel salva!", Toast.LENGTH_SHORT).show()
-        }
-
-        binding.btnOpenControlPanel.setOnClickListener {
-            val pin = prefs.parentalPin
-            if (pin.isNotEmpty()) {
-                val input = EditText(this).apply {
-                    hint = "Digite o PIN para abrir o Painel"
-                    inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-                }
-                AlertDialog.Builder(this)
-                    .setTitle("Acesso ao Painel")
-                    .setView(input)
-                    .setPositiveButton("Entrar") { _, _ ->
-                        if (input.text.toString().trim() == pin) {
-                            startActivity(Intent(this, ControlPanelActivity::class.java))
-                        } else {
-                            Toast.makeText(this, "PIN incorreto!", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                    .setNegativeButton("Cancelar", null)
-                    .show()
-            } else {
-                startActivity(Intent(this, ControlPanelActivity::class.java))
-            }
         }
     }
 

@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wtv Canais Online — Painel de Controle Ao Vivo</title>
+  <title>Wtv Canais Online — Painel Privado Ao Vivo</title>
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #07090F; color: #F8FAFC; padding: 24px; }
     .container { max-width: 980px; margin: 0 auto; }
     h1 { margin: 0 0 6px; font-size: 22px; }
     .sub { color: #94A3B8; font-size: 13px; margin-bottom: 18px; }
     .bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-    input { flex: 1; min-width: 260px; padding: 10px 14px; border-radius: 10px; border: 1px solid #24304A; background: #101522; color: #fff; }
+    input { flex: 1; min-width: 220px; padding: 10px 14px; border-radius: 10px; border: 1px solid #24304A; background: #101522; color: #fff; }
     button { padding: 10px 18px; border-radius: 10px; border: none; background: #2563EB; color: #fff; font-weight: 700; cursor: pointer; }
     .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
     .kpi { background: #101522; border: 1px solid #24304A; border-radius: 14px; padding: 16px; text-align: center; }
@@ -24,12 +24,13 @@
 </head>
 <body>
   <div class="container">
-    <h1>📊 Wtv Canais Online — Painel Ao Vivo</h1>
-    <div class="sub">Atualização automática a cada 5 segundos (considerando aparelhos ativos nos últimos 90s)</div>
+    <h1>🔒 Wtv Canais Online — Painel Privado Ao Vivo</h1>
+    <div class="sub">Atualização automática a cada 5 segundos (somente você tem acesso com sua URL e chave)</div>
 
     <div class="bar">
-      <input id="fbUrl" placeholder="Cole aqui a URL do Firebase (ex: https://seu-app-default-rtdb.firebaseio.com)" />
-      <button onclick="saveUrl()">Conectar</button>
+      <input id="fbUrl" placeholder="URL do Firebase (ex: https://seu-app-default-rtdb.firebaseio.com)" />
+      <input id="fbAuth" type="password" placeholder="Chave/Segredo do Firebase (opcional)" />
+      <button onclick="saveConfig()">Conectar</button>
     </div>
 
     <div class="kpis">
@@ -42,20 +43,27 @@
   </div>
 
   <script>
-    const input = document.getElementById('fbUrl');
-    input.value = localStorage.getItem('wtv_fb_url') || '';
+    const urlInput = document.getElementById('fbUrl');
+    const authInput = document.getElementById('fbAuth');
+    urlInput.value = localStorage.getItem('wtv_fb_url') || '';
+    authInput.value = localStorage.getItem('wtv_fb_auth') || '';
 
-    function saveUrl() {
-      localStorage.setItem('wtv_fb_url', input.value.trim().replace(/\/+$/, ''));
+    function saveConfig() {
+      localStorage.setItem('wtv_fb_url', urlInput.value.trim().replace(/\/+$/, ''));
+      localStorage.setItem('wtv_fb_auth', authInput.value.trim());
       refresh();
     }
 
     async function refresh() {
       const base = (localStorage.getItem('wtv_fb_url') || '').replace(/\/+$/, '');
+      const auth = localStorage.getItem('wtv_fb_auth') || '';
       if (!base) return;
       try {
-        const res = await fetch(`${base}/sessions.json`);
+        const endpoint = auth ? `${base}/sessions.json?auth=${encodeURIComponent(auth)}` : `${base}/sessions.json`;
+        const res = await fetch(endpoint);
         const data = await res.json();
+        if (data && data.error) throw new Error(data.error);
+
         const now = Date.now();
         const active = Object.values(data || {})
           .filter(s => s && (now - (s.lastSeenAt || 0)) <= 90000)
