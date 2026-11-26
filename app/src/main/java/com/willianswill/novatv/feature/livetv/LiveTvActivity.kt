@@ -85,6 +85,8 @@ class LiveTvActivity : AppCompatActivity() {
         binding.rvCategories.adapter = categoryAdapter
 
         channelAdapter = LiveChannelPagingAdapter(
+            scope = lifecycleScope,
+            lookupEpg = { profileId, chId -> repository.getCurrentEpg(profileId, chId) },
             onPreviewOrPlay = { stream, pos ->
                 if (currentPreviewStream?.id == stream.id) {
                     openFullscreenPlayer(pos)

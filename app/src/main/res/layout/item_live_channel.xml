@@ -11,9 +11,10 @@
 
     <ImageView
         android:id="@+id/iv_logo"
-        android:layout_width="42dp"
-        android:layout_height="42dp"
-        android:background="#07090F"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:background="@drawable/bg_poster_rounded"
+        android:clipToOutline="true"
         android:contentDescription="Logo"
         android:padding="4dp"
         android:scaleType="fitCenter"
@@ -46,6 +47,18 @@
             android:text="Categoria"
             android:textColor="@color/text_secondary"
             android:textSize="11sp" />
+
+        <ProgressBar
+            android:id="@+id/pb_epg"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_marginTop="4dp"
+            android:max="100"
+            android:progress="0"
+            android:progressBackgroundTint="#24304A"
+            android:progressTint="@color/accent_cyan"
+            android:visibility="gone" />
     </LinearLayout>
 
     <Button

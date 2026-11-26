@@ -11,8 +11,9 @@
     <ImageView
         android:id="@+id/iv_poster"
         android:layout_width="match_parent"
-        android:layout_height="96dp"
-        android:background="#07090F"
+        android:layout_height="140dp"
+        android:background="@drawable/bg_poster_rounded"
+        android:clipToOutline="true"
         android:contentDescription="Capa"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_tv_logo" />

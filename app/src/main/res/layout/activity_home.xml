@@ -117,6 +117,82 @@
                 android:textColor="#FFFFFF" />
         </LinearLayout>
 
+        <!-- Hero Banner (Destaque Cinematográfico) -->
+        <FrameLayout
+            android:id="@+id/hero_banner_container"
+            android:layout_width="match_parent"
+            android:layout_height="175dp"
+            android:layout_marginBottom="20dp"
+            android:background="@drawable/selector_cinema_card"
+            android:clipToOutline="true"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/iv_hero_backdrop"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="Destaque"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_tv_logo" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_hero_gradient" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="bottom"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:id="@+id/tv_hero_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✨ EM DESTAQUE"
+                    android:textColor="@color/accent_cyan"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_hero_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Título em Destaque"
+                    android:textColor="@color/text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_hero_sub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="Categoria"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/btn_hero_play"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:background="@drawable/selector_cinema_button"
+                    android:focusable="true"
+                    android:paddingHorizontal="18dp"
+                    android:text="▶ Assistir Agora"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </FrameLayout>
+
         <!-- Main Navigation Tiles (TV Box D-Pad & Mobile Touch) -->
         <LinearLayout
             android:layout_width="match_parent"

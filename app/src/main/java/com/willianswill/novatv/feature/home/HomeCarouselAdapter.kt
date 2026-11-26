@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.willianswill.novatv.R
 import com.willianswill.novatv.core.player.PlayableItem
+import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ItemMediaPosterBinding
 
 data class HomeCarouselItem(
@@ -27,6 +28,7 @@ class HomeCarouselAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val binding = ItemMediaPosterBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        binding.root.enableCinemaFocusZoom(1.06f)
         return VH(binding)
     }
 

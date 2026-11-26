@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.willianswill.novatv.R
 import com.willianswill.novatv.core.database.entity.StreamEntity
+import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ItemVodCardBinding
 
 class VodPagingAdapter(
@@ -22,6 +23,7 @@ class VodPagingAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val binding = ItemVodCardBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        binding.root.enableCinemaFocusZoom(1.06f)
         return VH(binding)
     }
 
