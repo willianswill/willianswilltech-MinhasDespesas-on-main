@@ -55,6 +55,17 @@ interface StreamDao {
     @Query(
         """
         SELECT * FROM streams
+        WHERE profileId = :profileId
+          AND mediaType = 'SERIES'
+          AND streamId = :seriesId
+        ORDER BY qualityRank ASC, id ASC
+        """
+    )
+    suspend fun getM3uSeriesEpisodes(profileId: Long, seriesId: String): List<StreamEntity>
+
+    @Query(
+        """
+        SELECT * FROM streams
         WHERE profileId = :profileId AND isFavorite = 1
           AND (:includeAdult = 1 OR isAdult = 0)
         ORDER BY name ASC

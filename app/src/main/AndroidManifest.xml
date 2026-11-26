@@ -15,7 +15,7 @@
         android:required="false" />
 
     <application
-        android:name="androidx.multidex.MultiDexApplication"
+        android:name=".NovaTvApp"
         android:allowBackup="true"
         android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher"

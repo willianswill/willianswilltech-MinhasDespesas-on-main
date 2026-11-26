@@ -2,6 +2,7 @@ package com.willianswill.novatv.core.parser
 
 import com.willianswill.novatv.core.database.entity.CategoryEntity
 import com.willianswill.novatv.core.database.entity.MediaType
+import com.willianswill.novatv.core.database.entity.SeriesEntity
 import com.willianswill.novatv.core.database.entity.StreamEntity
 import java.io.BufferedReader
 import java.io.InputStream
@@ -10,6 +11,7 @@ import java.io.InputStreamReader
 data class M3uParseStats(
     val totalChannels: Int,
     val totalMovies: Int,
+    val totalSeries: Int,
     val epgUrlHeader: String?
 )
 
@@ -19,16 +21,21 @@ object StreamingM3uParser {
     private val attrRegex = Regex("""([\w-]+)="([^"]*)"""")
     private val adultKeywords = listOf("adult", "xxx", "+18", "18+", "porn", "erotic", "sex")
     private val vodExtensions = listOf(".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv")
+    private val seriesGroupKeywords = listOf("série", "serie", "series", "novela", "dorama", "anime")
+    private val episodeRegex = Regex("""(?i)(?:S(\d{1,2})\s*E(\d{1,3})|T(\d{1,2})\s*E(\d{1,3})|\b(\d{1,2})x(\d{1,3})\b)""")
 
     suspend fun parseInChunks(
         profileId: Long,
         input: InputStream,
         favoriteUrls: Set<String>,
+        favoriteSeriesIds: Set<String> = emptySet(),
         onStreamsChunk: suspend (List<StreamEntity>) -> Unit,
-        onCategoriesCollected: suspend (List<CategoryEntity>) -> Unit
+        onCategoriesCollected: suspend (List<CategoryEntity>) -> Unit,
+        onSeriesCollected: suspend (List<SeriesEntity>) -> Unit = {}
     ): M3uParseStats {
         val batch = ArrayList<StreamEntity>(CHUNK_SIZE)
         val categoriesMap = LinkedHashMap<String, CategoryEntity>()
+        val seriesMap = LinkedHashMap<String, SeriesEntity>()
         var epgHeaderUrl: String? = null
         var liveCount = 0
         var movieCount = 0
@@ -115,8 +122,11 @@ object StreamingM3uParser {
                                 } else {
                                     "Canal $indexCounter"
                                 }
-                                val mediaType = detectMediaType(streamUrl, pendingGroup)
-                                if (mediaType == MediaType.MOVIE) movieCount++ else liveCount++
+                                val mediaType = detectMediaType(streamUrl, pendingGroup, finalName)
+                                when (mediaType) {
+                                    MediaType.MOVIE -> movieCount++
+                                    MediaType.LIVE -> liveCount++
+                                }
 
                                 val catKey = "${mediaType}_${pendingGroup.lowercase()}"
                                 val isAdult = isAdultText(pendingGroup) || isAdultText(finalName)
@@ -133,35 +143,74 @@ object StreamingM3uParser {
                                     )
                                 }
 
-                                val parsedQuality = if (mediaType == MediaType.LIVE) {
-                                    ChannelQualityParser.parse(finalName)
-                                } else {
-                                    ParsedChannelQuality(finalName, "VOD", 2)
-                                }
-
-                                batch.add(
-                                    StreamEntity(
-                                        profileId = profileId,
-                                        streamId = indexCounter.toString(),
-                                        mediaType = mediaType,
-                                        name = finalName,
-                                        baseName = parsedQuality.baseName,
-                                        qualityLabel = parsedQuality.qualityLabel,
-                                        qualityRank = parsedQuality.qualityRank,
-                                        streamUrl = streamUrl,
-                                        iconUrl = pendingLogo,
-                                        categoryId = catId,
-                                        categoryName = pendingGroup,
-                                        epgChannelId = pendingTvgId,
-                                        hasCatchup = pendingCatchupDays > 0,
-                                        catchupDays = pendingCatchupDays,
-                                        userAgent = ua,
-                                        referrer = ref,
-                                        isFavorite = favoriteUrls.contains(streamUrl),
-                                        isAdult = isAdult,
-                                        addedAt = System.currentTimeMillis()
+                                if (mediaType == MediaType.SERIES) {
+                                    val (seriesTitle, seasonNum, epNum) = parseSeriesEpisode(finalName)
+                                    val seriesId = "m3u_${catId}_${seriesTitle.lowercase().hashCode()}"
+                                    if (!seriesMap.containsKey(seriesId)) {
+                                        seriesMap[seriesId] = SeriesEntity(
+                                            profileId = profileId,
+                                            seriesId = seriesId,
+                                            name = seriesTitle,
+                                            coverUrl = pendingLogo,
+                                            categoryId = catId,
+                                            categoryName = pendingGroup,
+                                            isFavorite = favoriteSeriesIds.contains(seriesId),
+                                            isAdult = isAdult,
+                                            lastModified = System.currentTimeMillis()
+                                        )
+                                    }
+                                    batch.add(
+                                        StreamEntity(
+                                            profileId = profileId,
+                                            streamId = seriesId,
+                                            mediaType = MediaType.SERIES,
+                                            name = finalName,
+                                            baseName = seriesTitle,
+                                            qualityLabel = "T${seasonNum}E${epNum}",
+                                            qualityRank = (seasonNum * 1000) + epNum,
+                                            streamUrl = streamUrl,
+                                            iconUrl = pendingLogo,
+                                            categoryId = catId,
+                                            categoryName = pendingGroup,
+                                            epgChannelId = "$seasonNum:$epNum",
+                                            userAgent = ua,
+                                            referrer = ref,
+                                            isFavorite = favoriteUrls.contains(streamUrl),
+                                            isAdult = isAdult,
+                                            addedAt = System.currentTimeMillis()
+                                        )
                                     )
-                                )
+                                } else {
+                                    val parsedQuality = if (mediaType == MediaType.LIVE) {
+                                        ChannelQualityParser.parse(finalName)
+                                    } else {
+                                        ParsedChannelQuality(finalName, "VOD", 2)
+                                    }
+
+                                    batch.add(
+                                        StreamEntity(
+                                            profileId = profileId,
+                                            streamId = indexCounter.toString(),
+                                            mediaType = mediaType,
+                                            name = finalName,
+                                            baseName = parsedQuality.baseName,
+                                            qualityLabel = parsedQuality.qualityLabel,
+                                            qualityRank = parsedQuality.qualityRank,
+                                            streamUrl = streamUrl,
+                                            iconUrl = pendingLogo,
+                                            categoryId = catId,
+                                            categoryName = pendingGroup,
+                                            epgChannelId = pendingTvgId,
+                                            hasCatchup = pendingCatchupDays > 0,
+                                            catchupDays = pendingCatchupDays,
+                                            userAgent = ua,
+                                            referrer = ref,
+                                            isFavorite = favoriteUrls.contains(streamUrl),
+                                            isAdult = isAdult,
+                                            addedAt = System.currentTimeMillis()
+                                        )
+                                    )
+                                }
 
                                 if (batch.size >= CHUNK_SIZE) {
                                     onStreamsChunk(batch.toList())
@@ -193,9 +242,14 @@ object StreamingM3uParser {
             onCategoriesCollected(categoriesMap.values.toList())
         }
 
+        if (seriesMap.isNotEmpty()) {
+            onSeriesCollected(seriesMap.values.toList())
+        }
+
         return M3uParseStats(
             totalChannels = liveCount,
             totalMovies = movieCount,
+            totalSeries = seriesMap.size,
             epgUrlHeader = epgHeaderUrl
         )
     }
@@ -207,16 +261,37 @@ object StreamingM3uParser {
             url.startsWith("rtmp://", true)
     }
 
-    private fun detectMediaType(url: String, group: String): String {
+    private fun detectMediaType(url: String, group: String, name: String): String {
         val lowerUrl = url.lowercase().substringBefore('?')
-        if (vodExtensions.any { lowerUrl.endsWith(it) }) {
-            return MediaType.MOVIE
-        }
         val lowerGroup = group.lowercase()
-        if (lowerGroup.contains("filme") || lowerGroup.contains("movie") || lowerGroup.contains("vod")) {
+        if (lowerUrl.contains("/series/") ||
+            seriesGroupKeywords.any { lowerGroup.contains(it) } ||
+            episodeRegex.containsMatchIn(name)
+        ) {
+            return MediaType.SERIES
+        }
+        if (vodExtensions.any { lowerUrl.endsWith(it) } ||
+            lowerGroup.contains("filme") ||
+            lowerGroup.contains("movie") ||
+            lowerGroup.contains("vod")
+        ) {
             return MediaType.MOVIE
         }
         return MediaType.LIVE
+    }
+
+    private fun parseSeriesEpisode(name: String): Triple<String, Int, Int> {
+        val match = episodeRegex.find(name)
+        if (match != null) {
+            val s = (match.groupValues[1].ifEmpty { match.groupValues[3] }.ifEmpty { match.groupValues[5] }).toIntOrNull() ?: 1
+            val e = (match.groupValues[2].ifEmpty { match.groupValues[4] }.ifEmpty { match.groupValues[6] }).toIntOrNull() ?: 1
+            val title = name.substring(0, match.range.first)
+                .replace(Regex("""[\s\-|]+$"""), "")
+                .trim()
+                .ifBlank { name.trim() }
+            return Triple(title, s, e)
+        }
+        return Triple(name.trim(), 1, 1)
     }
 
     private fun isAdultText(text: String): Boolean {

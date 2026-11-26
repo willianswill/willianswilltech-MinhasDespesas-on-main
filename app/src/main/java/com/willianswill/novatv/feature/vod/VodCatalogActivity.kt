@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.ProfileEntity
+import com.willianswill.novatv.core.database.entity.ProfileType
 import com.willianswill.novatv.core.database.entity.SeriesEntity
 import com.willianswill.novatv.core.database.entity.StreamEntity
 import com.willianswill.novatv.core.network.XtreamApiClient
@@ -203,47 +204,79 @@ class VodCatalogActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val client = XtreamApiClient()
-                val res = client.getSeriesInfo(
-                    profile.serverUrl,
-                    profile.username,
-                    profile.password,
-                    series.seriesId,
-                    profile.userAgent.takeIf { it.isNotBlank() }
-                )
-
-                val episodes = res.episodes.entries
-                    .sortedBy { it.key.toIntOrNull() ?: 999 }
-                    .flatMap { (_, epList) -> epList.sortedBy { it.episodeNum } }
-
                 val historyMap = repository.getSeriesHistory(profile.id, series.seriesId)
                     .associateBy { it.contentKey }
 
-                val entries = episodes.map { ep ->
-                    val ext = ep.containerExtension.orEmpty().ifBlank { "mp4" }
-                    val epUrl = client.buildSeriesEpisodeUrl(profile.serverUrl, profile.username, profile.password, ep.id, ext)
-                    val saved = historyMap[epUrl]
-                    val pct = if (saved != null && saved.durationMs > 0L) {
-                        ((saved.positionMs * 100) / saved.durationMs).toInt().coerceIn(1, 100)
-                    } else 0
-
-                    EpisodeUiEntry(
-                        playable = PlayableItem(
-                            contentKey = epUrl,
-                            title = "${series.name} • T${ep.season}E${ep.episodeNum}",
-                            subtitle = ep.title,
-                            streamUrl = epUrl,
-                            iconUrl = ep.info?.movieImage ?: series.coverUrl,
-                            mediaType = MediaType.SERIES,
-                            streamId = ep.id,
-                            userAgent = profile.userAgent.takeIf { it.isNotBlank() },
-                            resumePositionMs = saved?.positionMs ?: 0L,
-                            seriesId = series.seriesId,
-                            seasonNum = ep.season,
-                            episodeNum = ep.episodeNum
-                        ),
-                        progressPercent = pct
+                val entries: List<EpisodeUiEntry> = if (profile.type == ProfileType.XTREAM.name && !series.seriesId.startsWith("m3u_")) {
+                    val client = XtreamApiClient()
+                    val res = client.getSeriesInfo(
+                        profile.serverUrl,
+                        profile.username,
+                        profile.password,
+                        series.seriesId,
+                        profile.userAgent.takeIf { it.isNotBlank() }
                     )
+
+                    val episodes = res.episodes.entries
+                        .sortedBy { it.key.toIntOrNull() ?: 999 }
+                        .flatMap { (_, epList) -> epList.sortedBy { it.episodeNum } }
+
+                    episodes.map { ep ->
+                        val ext = ep.containerExtension.orEmpty().ifBlank { "mp4" }
+                        val epUrl = client.buildSeriesEpisodeUrl(profile.serverUrl, profile.username, profile.password, ep.id, ext)
+                        val saved = historyMap[epUrl]
+                        val pct = if (saved != null && saved.durationMs > 0L) {
+                            ((saved.positionMs * 100) / saved.durationMs).toInt().coerceIn(1, 100)
+                        } else 0
+
+                        EpisodeUiEntry(
+                            playable = PlayableItem(
+                                contentKey = epUrl,
+                                title = "${series.name} • T${ep.season}E${ep.episodeNum}",
+                                subtitle = ep.title,
+                                streamUrl = epUrl,
+                                iconUrl = ep.info?.movieImage ?: series.coverUrl,
+                                mediaType = MediaType.SERIES,
+                                streamId = ep.id,
+                                userAgent = profile.userAgent.takeIf { it.isNotBlank() },
+                                resumePositionMs = saved?.positionMs ?: 0L,
+                                seriesId = series.seriesId,
+                                seasonNum = ep.season,
+                                episodeNum = ep.episodeNum
+                            ),
+                            progressPercent = pct
+                        )
+                    }
+                } else {
+                    val m3uEpisodes = repository.getM3uSeriesEpisodes(profile.id, series.seriesId)
+                    m3uEpisodes.map { ep ->
+                        val saved = historyMap[ep.streamUrl]
+                        val pct = if (saved != null && saved.durationMs > 0L) {
+                            ((saved.positionMs * 100) / saved.durationMs).toInt().coerceIn(1, 100)
+                        } else 0
+                        val parts = ep.epgChannelId.split(":")
+                        val season = parts.getOrNull(0)?.toIntOrNull() ?: 1
+                        val epNum = parts.getOrNull(1)?.toIntOrNull() ?: 1
+
+                        EpisodeUiEntry(
+                            playable = PlayableItem(
+                                contentKey = ep.streamUrl,
+                                title = "${series.name} • ${ep.qualityLabel}",
+                                subtitle = ep.name,
+                                streamUrl = ep.streamUrl,
+                                iconUrl = ep.iconUrl.ifBlank { series.coverUrl },
+                                mediaType = MediaType.SERIES,
+                                streamId = ep.streamId,
+                                userAgent = ep.userAgent,
+                                referrer = ep.referrer,
+                                resumePositionMs = saved?.positionMs ?: 0L,
+                                seriesId = series.seriesId,
+                                seasonNum = season,
+                                episodeNum = epNum
+                            ),
+                            progressPercent = pct
+                        )
+                    }
                 }
 
                 withContext(Dispatchers.Main) {

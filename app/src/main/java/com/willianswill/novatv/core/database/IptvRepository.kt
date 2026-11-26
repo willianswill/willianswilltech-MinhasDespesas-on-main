@@ -169,6 +169,11 @@ class IptvRepository(context: Context) {
             )
         }
 
+    suspend fun getM3uSeriesEpisodes(profileId: Long, seriesId: String): List<StreamEntity> =
+        withContext(Dispatchers.IO) {
+            streamDao.getM3uSeriesEpisodes(profileId, seriesId)
+        }
+
     suspend fun syncActiveProfile(): ProfileEntity? = withContext(Dispatchers.IO) {
         val profile = profileDao.getActiveProfile() ?: return@withContext null
         when (profile.type) {
@@ -323,7 +328,7 @@ class IptvRepository(context: Context) {
 
         seriesDtos.chunked(500).forEach { chunk ->
             val entities = chunk.map { dto ->
-                val sid = dto.seriesId.toString()
+                val sid = dto.seriesId?.content.orEmpty().ifBlank { dto.name.hashCode().toString() }
                 val catId = dto.categoryId.orEmpty()
                 val catName = catNameMap["S_$catId"] ?: "Séries"
                 val ratingStr = (dto.rating as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -365,6 +370,7 @@ class IptvRepository(context: Context) {
     suspend fun syncM3uStream(profile: ProfileEntity, input: InputStream): ProfileEntity =
         withContext(Dispatchers.IO) {
             val favStreamUrls = streamDao.getFavoriteUrls(profile.id).toHashSet()
+            val favSeriesIds = seriesDao.getFavoriteSeriesIds(profile.id).toHashSet()
             categoryDao.deleteByProfile(profile.id)
             streamDao.deleteByProfile(profile.id)
             seriesDao.deleteByProfile(profile.id)
@@ -373,9 +379,13 @@ class IptvRepository(context: Context) {
                 profileId = profile.id,
                 input = input,
                 favoriteUrls = favStreamUrls,
+                favoriteSeriesIds = favSeriesIds,
                 onStreamsChunk = { chunk -> streamDao.insertAll(chunk) },
                 onCategoriesCollected = { cats ->
                     cats.chunked(500).forEach { categoryDao.insertAll(it) }
+                },
+                onSeriesCollected = { seriesList ->
+                    seriesList.chunked(500).forEach { seriesDao.insertAll(it) }
                 }
             )
 
@@ -384,7 +394,7 @@ class IptvRepository(context: Context) {
                 lastSyncAt = System.currentTimeMillis(),
                 totalChannels = stats.totalChannels,
                 totalMovies = stats.totalMovies,
-                totalSeries = 0
+                totalSeries = stats.totalSeries
             )
             profileDao.update(updated)
             updated

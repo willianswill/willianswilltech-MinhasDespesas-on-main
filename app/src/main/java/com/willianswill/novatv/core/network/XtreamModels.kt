@@ -58,7 +58,7 @@ data class XtreamVodDto(
 
 @Serializable
 data class XtreamSeriesDto(
-    @SerialName("series_id") val seriesId: Long = 0L,
+    @SerialName("series_id") val seriesId: kotlinx.serialization.json.JsonPrimitive? = null,
     val name: String = "",
     val cover: String? = null,
     val plot: String? = null,
