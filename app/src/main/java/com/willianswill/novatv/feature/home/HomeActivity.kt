@@ -1,8 +1,10 @@
 package com.willianswill.novatv.feature.home
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -13,6 +15,8 @@ import com.willianswill.novatv.R
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
+import com.willianswill.novatv.core.network.AppUpdateChecker
+import com.willianswill.novatv.core.network.AppUpdateInfo
 import com.willianswill.novatv.core.network.CatalogSyncWorker
 import com.willianswill.novatv.core.player.AppPreferences
 import com.willianswill.novatv.core.player.MultiViewActivity
@@ -44,6 +48,7 @@ class HomeActivity : AppCompatActivity() {
     private var favPlayables: List<PlayableItem> = emptyList()
     private var heroPlayable: PlayableItem? = null
     private var profileDataJob: Job? = null
+    private var startupSyncTriggered = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +62,7 @@ class HomeActivity : AppCompatActivity() {
         setupCarousels()
         setupNavigation()
         observeActiveProfile()
+        checkAppUpdateOnStartup()
     }
 
     private fun setupCarousels() {
@@ -191,6 +197,18 @@ class HomeActivity : AppCompatActivity() {
                 binding.tvActiveProfile.text =
                     "${profile.name} • ${profile.totalChannels} canais • ${profile.totalMovies} filmes"
 
+                if (!startupSyncTriggered && System.currentTimeMillis() - profile.lastSyncAt > 30L * 60L * 1000L) {
+                    startupSyncTriggered = true
+                    lifecycleScope.launch {
+                        runCatching {
+                            val updated = repository.syncActiveProfile()
+                            if (updated != null && updated.epgUrl.isNotBlank()) {
+                                repository.syncEpgForProfile(updated)
+                            }
+                        }
+                    }
+                }
+
                 val includeAdult = prefs.showAdultContent
                 profileDataJob = lifecycleScope.launch {
                     launch {
@@ -304,6 +322,51 @@ class HomeActivity : AppCompatActivity() {
         val s = sec % 60L
         return if (h > 0) String.format(Locale.getDefault(), "%d:%02d:%02d", h, m, s)
         else String.format(Locale.getDefault(), "%02d:%02d", m, s)
+    }
+
+    private fun checkAppUpdateOnStartup() {
+        lifecycleScope.launch {
+            val info = AppUpdateChecker.checkForUpdate(this@HomeActivity) ?: return@launch
+            if (isFinishing || isDestroyed) return@launch
+            showUpdateDialog(info)
+        }
+    }
+
+    private fun showUpdateDialog(info: AppUpdateInfo) {
+        AlertDialog.Builder(this)
+            .setTitle("Nova versão disponível (${info.versionName})")
+            .setMessage(info.notes.ifBlank { "Há uma nova atualização do NovaTV IPTV pronta para instalar." })
+            .setPositiveButton("⬇ Atualizar Agora") { _, _ ->
+                if (info.apkDownloadUrl.isBlank()) {
+                    if (info.releasePageUrl.isNotBlank()) {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.releasePageUrl)))
+                    }
+                    return@setPositiveButton
+                }
+                val pb = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                    max = 100
+                    setPadding(48, 24, 48, 24)
+                }
+                val dlDialog = AlertDialog.Builder(this)
+                    .setTitle("Baixando ${info.versionName}...")
+                    .setView(pb)
+                    .setCancelable(false)
+                    .show()
+
+                lifecycleScope.launch {
+                    try {
+                        AppUpdateChecker.downloadAndInstallApk(this@HomeActivity, info.apkDownloadUrl) { pct ->
+                            pb.progress = pct
+                        }
+                        dlDialog.dismiss()
+                    } catch (e: Exception) {
+                        dlDialog.dismiss()
+                        Toast.makeText(this@HomeActivity, "Falha ao atualizar: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Depois", null)
+            .show()
     }
 
     private fun updateHeroBanner(item: PlayableItem, badge: String, buttonText: String) {

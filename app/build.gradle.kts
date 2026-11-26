@@ -10,11 +10,12 @@ android {
     compileSdk = 35
 
     defaultConfig {
+        val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         applicationId = "com.willianswill.novatv"
         minSdk = 21
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = runNumber
+        versionName = "1.0.$runNumber"
         multiDexEnabled = true
     }
 
