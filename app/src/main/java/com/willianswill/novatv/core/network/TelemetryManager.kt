@@ -184,9 +184,10 @@ object TelemetryManager {
                     put("lastSeenAt", System.currentTimeMillis())
                 }
 
+                val authQuery = resolveAnonAuthQuery(appCtx)
                 val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                 val req = Request.Builder()
-                    .url("$baseUrl/sessions/$deviceId.json")
+                    .url("$baseUrl/sessions/$deviceId.json$authQuery")
                     .patch(body)
                     .build()
 
@@ -209,9 +210,42 @@ object TelemetryManager {
         runCatching { fetchRemoteCommandInternal(context, baseUrl, deviceId) }.getOrNull()
     }
 
+    @Volatile
+    private var cachedAnonToken: String = ""
+    @Volatile
+    private var cachedAnonExpiryMs: Long = 0L
+
+    private fun resolveAnonAuthQuery(context: Context): String {
+        val apiKey = com.willianswill.novatv.core.security.SecretVault.firebaseApiKey().trim()
+        if (apiKey.isBlank()) return ""
+        val now = System.currentTimeMillis()
+        if (cachedAnonToken.isNotBlank() && now < cachedAnonExpiryMs) {
+            return "?auth=$cachedAnonToken"
+        }
+        val token = runCatching {
+            val req = Request.Builder()
+                .url("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=$apiKey")
+                .post("{\"returnSecureToken\":true}".toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            HttpClientProvider.sharedClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use ""
+                val json = JSONObject(resp.body?.string().orEmpty())
+                val idToken = json.optString("idToken", "")
+                val expiresSec = json.optString("expiresIn", "3600").toLongOrNull() ?: 3600L
+                if (idToken.isNotBlank()) {
+                    cachedAnonToken = idToken
+                    cachedAnonExpiryMs = now + (expiresSec * 1000L) - 60_000L
+                }
+                idToken
+            }
+        }.getOrDefault("")
+        return if (token.isNotBlank()) "?auth=$token" else ""
+    }
+
     private fun fetchRemoteCommandInternal(context: Context, baseUrl: String, deviceId: String): RemoteCommand? {
+        val authQuery = resolveAnonAuthQuery(context)
         val req = Request.Builder()
-            .url("$baseUrl/commands/$deviceId.json")
+            .url("$baseUrl/commands/$deviceId.json$authQuery")
             .get()
             .build()
 

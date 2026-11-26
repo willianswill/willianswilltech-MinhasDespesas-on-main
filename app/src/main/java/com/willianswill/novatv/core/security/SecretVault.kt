@@ -27,6 +27,8 @@ object SecretVault {
 
     fun latestReleaseUrl(): String = decode(updateUrlData, 0x37)
 
+    fun firebaseApiKey(): String = ""
+
     private fun decode(data: IntArray, key: Int): String = buildString(data.size) {
         for (b in data) append((b xor key).toChar())
     }
