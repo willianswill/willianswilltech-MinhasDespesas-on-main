@@ -96,4 +96,20 @@ object HttpClientProvider {
 
         builder.build()
     }
+
+    // Cliente dedicado para capas/pôsteres (TMDB, Cloudflare, painéis IPTV) com User-Agent de navegador
+    val imageClient: OkHttpClient by lazy {
+        sharedClient.newBuilder()
+            .addInterceptor { chain ->
+                val req = chain.request().newBuilder()
+                    .header(
+                        "User-Agent",
+                        "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                    )
+                    .header("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
+                    .build()
+                chain.proceed(req)
+            }
+            .build()
+    }
 }

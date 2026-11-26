@@ -10,11 +10,11 @@ import java.io.InputStream
 class NovaTvApp : MultiDexApplication() {
     override fun onCreate() {
         super.onCreate()
-        // Faz o Glide usar o mesmo OkHttpClient resiliente (SSL IPTV + Redirects + IPv4/DoH)
+        // Faz o Glide usar o imageClient resiliente (User-Agent navegador + SSL IPTV + Redirects + IPv4/DoH)
         Glide.get(this).registry.replace(
             GlideUrl::class.java,
             InputStream::class.java,
-            OkHttpUrlLoader.Factory(HttpClientProvider.sharedClient)
+            OkHttpUrlLoader.Factory(HttpClientProvider.imageClient)
         )
     }
 }
