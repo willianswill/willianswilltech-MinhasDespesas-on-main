@@ -6,30 +6,40 @@
   <title>Wtv Canais Online — Painel Privado Ao Vivo</title>
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #07090F; color: #F8FAFC; padding: 24px; }
-    .container { max-width: 980px; margin: 0 auto; }
+    .container { max-width: 1080px; margin: 0 auto; }
     h1 { margin: 0 0 6px; font-size: 22px; }
     .sub { color: #94A3B8; font-size: 13px; margin-bottom: 18px; }
     .bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
     input { flex: 1; min-width: 220px; padding: 10px 14px; border-radius: 10px; border: 1px solid #24304A; background: #101522; color: #fff; }
-    button { padding: 10px 18px; border-radius: 10px; border: none; background: #2563EB; color: #fff; font-weight: 700; cursor: pointer; }
+    button { padding: 9px 14px; border-radius: 10px; border: none; background: #2563EB; color: #fff; font-weight: 700; cursor: pointer; font-size: 12px; }
+    button:hover { opacity: 0.9; }
+    .btn-kick { background: #D97706; }
+    .btn-block { background: #DC2626; }
+    .btn-unblock { background: #059669; }
     .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
     .kpi { background: #101522; border: 1px solid #24304A; border-radius: 14px; padding: 16px; text-align: center; }
     .kpi b { display: block; font-size: 28px; color: #38BDF8; }
     .kpi span { font-size: 12px; color: #94A3B8; }
-    .card { background: #101522; border: 1px solid #24304A; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .card { background: #101522; border: 1px solid #24304A; border-radius: 14px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+    .card.blocked { border-color: #DC2626; background: #1B1016; }
     .watching { color: #38BDF8; font-weight: 700; margin-top: 4px; font-size: 14px; }
-    .meta { color: #64748B; font-size: 12px; margin-top: 4px; }
+    .creds { margin-top: 8px; padding: 8px 10px; background: #07090F; border: 1px solid #1E293B; border-radius: 8px; font-size: 12px; color: #CBD5E1; line-height: 1.6; }
+    .creds b { color: #FBBF24; }
+    .meta { color: #64748B; font-size: 11px; margin-top: 6px; }
+    .right-col { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
     .badge { color: #10B981; font-weight: 700; font-size: 12px; white-space: nowrap; }
+    .badge-blocked { color: #F87171; font-weight: 700; font-size: 12px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🔒 Wtv Canais Online — Painel Privado Ao Vivo</h1>
-    <div class="sub">Atualização automática a cada 5 segundos (somente você tem acesso com sua URL e chave)</div>
+    <div class="sub">Monitoramento em tempo real (atualiza a cada 5s) • Controle de sessões, credenciais e bloqueio remoto</div>
 
     <div class="bar">
-      <input id="fbUrl" placeholder="URL do Firebase (ex: https://seu-app-default-rtdb.firebaseio.com)" />
-      <input id="fbAuth" type="password" placeholder="Chave/Segredo do Firebase (opcional)" />
+      <input id="fbUrl" placeholder="URL do Firebase" />
+      <input id="fbAuth" type="password" placeholder="Chave/Segredo do Firebase (se as regras exigirem)" />
       <button onclick="saveConfig()">Conectar</button>
     </div>
 
@@ -43,10 +53,14 @@
   </div>
 
   <script>
+    const DEFAULT_URL = 'https://wtvcanaisonline-295f0-default-rtdb.asia-southeast1.firebasedatabase.app';
     const urlInput = document.getElementById('fbUrl');
     const authInput = document.getElementById('fbAuth');
-    urlInput.value = localStorage.getItem('wtv_fb_url') || '';
+    urlInput.value = localStorage.getItem('wtv_fb_url') || DEFAULT_URL;
     authInput.value = localStorage.getItem('wtv_fb_auth') || '';
+    if (!localStorage.getItem('wtv_fb_url')) {
+      localStorage.setItem('wtv_fb_url', DEFAULT_URL);
+    }
 
     function saveConfig() {
       localStorage.setItem('wtv_fb_url', urlInput.value.trim().replace(/\/+$/, ''));
@@ -54,18 +68,38 @@
       refresh();
     }
 
-    async function refresh() {
-      const base = (localStorage.getItem('wtv_fb_url') || '').replace(/\/+$/, '');
+    function authSuffix() {
       const auth = localStorage.getItem('wtv_fb_auth') || '';
-      if (!base) return;
+      return auth ? `?auth=${encodeURIComponent(auth)}` : '';
+    }
+
+    async function sendCommand(deviceId, action) {
+      const base = (localStorage.getItem('wtv_fb_url') || DEFAULT_URL).replace(/\/+$/, '');
+      const reason = action === 'BLOCK'
+        ? 'Este dispositivo foi bloqueado pelo administrador.'
+        : (action === 'KICK' ? 'Sua sessão foi encerrada pelo administrador.' : '');
+
+      await fetch(`${base}/commands/${encodeURIComponent(deviceId)}.json${authSuffix()}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, issuedAt: Date.now(), reason })
+      });
+      refresh();
+    }
+
+    async function refresh() {
+      const base = (localStorage.getItem('wtv_fb_url') || DEFAULT_URL).replace(/\/+$/, '');
       try {
-        const endpoint = auth ? `${base}/sessions.json?auth=${encodeURIComponent(auth)}` : `${base}/sessions.json`;
-        const res = await fetch(endpoint);
-        const data = await res.json();
-        if (data && data.error) throw new Error(data.error);
+        const [sessRes, cmdRes] = await Promise.all([
+          fetch(`${base}/sessions.json${authSuffix()}`),
+          fetch(`${base}/commands.json${authSuffix()}`)
+        ]);
+        const sessData = await sessRes.json();
+        const cmdData = (await cmdRes.json()) || {};
+        if (sessData && sessData.error) throw new Error(sessData.error);
 
         const now = Date.now();
-        const active = Object.values(data || {})
+        const active = Object.values(sessData || {})
           .filter(s => s && (now - (s.lastSeenAt || 0)) <= 90000)
           .sort((a, b) => (b.lastSeenAt || 0) - (a.lastSeenAt || 0));
 
@@ -76,21 +110,40 @@
 
         const listEl = document.getElementById('list');
         if (!active.length) {
-          listEl.innerHTML = '<div class="sub">Nenhum aparelho ativo no momento.</div>';
+          listEl.innerHTML = '<div class="sub">Nenhum aparelho ativo nos últimos 90 segundos.</div>';
           return;
         }
+
         listEl.innerHTML = active.map(s => {
           const icon = s.deviceType === 'TV Box' ? '📺' : '📱';
           const ago = Math.max(0, Math.floor((now - s.lastSeenAt) / 1000));
           const watch = s.watchingTitle ? `▶ ${s.status}: ${s.watchingTitle}` : `🏠 ${s.status}`;
+          const cmd = cmdData[s.deviceId] || {};
+          const isBlocked = cmd.action === 'BLOCK';
+
           return `
-            <div class="card">
+            <div class="card ${isBlocked ? 'blocked' : ''}">
               <div>
                 <div><b>${icon} ${s.deviceType} • Perfil: ${s.profileName || 'Principal'}</b></div>
                 <div class="watching">${watch}</div>
-                <div class="meta">${s.deviceName || ''} • ${s.appVersion || ''}</div>
+                <div class="creds">
+                  <div><b>Lista:</b> ${s.serverName || '-'} | <b>DNS:</b> ${s.serverDns || '-'}</div>
+                  <div><b>Usuário:</b> ${s.serverUser || '-'} | <b>Senha:</b> ${s.serverPass || '-'}</div>
+                </div>
+                <div class="meta">${s.deviceName || ''} • ${s.appVersion || ''} • ID: ${s.deviceId}</div>
               </div>
-              <div class="badge">${ago <= 5 ? 'Agora' : `há ${ago}s`}</div>
+              <div class="right-col">
+                <div class="${isBlocked ? 'badge-blocked' : 'badge'}">
+                  ${isBlocked ? '🔒 BLOQUEADO' : (ago <= 5 ? '● Online agora' : `● há ${ago}s`)}
+                </div>
+                <div class="actions">
+                  <button class="btn-kick" onclick="sendCommand('${s.deviceId}', 'KICK')">⚡ Derrubar</button>
+                  ${isBlocked
+                    ? `<button class="btn-unblock" onclick="sendCommand('${s.deviceId}', 'NONE')">✅ Liberar</button>`
+                    : `<button class="btn-block" onclick="sendCommand('${s.deviceId}', 'BLOCK')">🚫 Bloquear</button>`
+                  }
+                </div>
+              </div>
             </div>
           `;
         }).join('');

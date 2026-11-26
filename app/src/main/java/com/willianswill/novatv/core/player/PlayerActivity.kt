@@ -837,7 +837,12 @@ class PlayerActivity : AppCompatActivity() {
             status = statusLabel,
             watchingTitle = item.title,
             watchingType = item.mediaType
-        )
+        ) { cmd ->
+            releasePlayer()
+            TelemetryManager.handleCommandOnActivity(this, cmd) {
+                startPlayback(isRetry = false)
+            }
+        }
     }
 
     private fun updateSeekProgress() {

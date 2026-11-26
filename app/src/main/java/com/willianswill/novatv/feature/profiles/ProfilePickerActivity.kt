@@ -14,9 +14,12 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.willianswill.novatv.R
+import com.willianswill.novatv.core.network.TelemetryManager
+import kotlinx.coroutines.launch
 import com.willianswill.novatv.core.player.UserAvatar
 import com.willianswill.novatv.core.player.UserProfile
 import com.willianswill.novatv.core.player.UserProfileManager
@@ -58,6 +61,20 @@ class ProfilePickerActivity : AppCompatActivity() {
         }
 
         refreshProfiles()
+        verifyRemoteBlockStatus()
+    }
+
+    private fun verifyRemoteBlockStatus() {
+        lifecycleScope.launch {
+            val cmd = TelemetryManager.checkCommandNow(this@ProfilePickerActivity) ?: return@launch
+            if (cmd.action == "BLOCK") {
+                TelemetryManager.handleCommandOnActivity(this@ProfilePickerActivity, cmd) {
+                    verifyRemoteBlockStatus()
+                }
+            } else if (cmd.action == "KICK") {
+                TelemetryManager.markKickHandled(this@ProfilePickerActivity, cmd.issuedAt)
+            }
+        }
     }
 
     private fun refreshProfiles() {

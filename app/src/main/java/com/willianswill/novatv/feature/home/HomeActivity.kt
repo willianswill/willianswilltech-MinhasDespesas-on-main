@@ -89,7 +89,7 @@ class HomeActivity : AppCompatActivity() {
         val user = UserProfileManager.getActiveUser(this)
         val avatar = UserProfileManager.getAvatar(user.avatarId)
         binding.btnSwitchProfile.text = "${avatar.emoji} ${user.name}"
-        TelemetryManager.sendHeartbeat(this, "Online no Menu")
+        checkTelemetryHeartbeat()
         bannerHandler.removeCallbacks(autoRotateBanner)
         bannerHandler.postDelayed(autoRotateBanner, 6000L)
     }
@@ -437,6 +437,14 @@ class HomeActivity : AppCompatActivity() {
         val s = sec % 60L
         return if (h > 0) String.format(Locale.getDefault(), "%d:%02d:%02d", h, m, s)
         else String.format(Locale.getDefault(), "%02d:%02d", m, s)
+    }
+
+    private fun checkTelemetryHeartbeat() {
+        TelemetryManager.sendHeartbeat(this, "Online no Menu") { cmd ->
+            TelemetryManager.handleCommandOnActivity(this, cmd) {
+                checkTelemetryHeartbeat()
+            }
+        }
     }
 
     private fun checkAppUpdateOnStartup() {
