@@ -14,6 +14,7 @@ import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
 import com.willianswill.novatv.core.network.XtreamApiClient
 import com.willianswill.novatv.core.parser.ChannelQualityParser
 import com.willianswill.novatv.core.parser.StreamingM3uParser
+import com.willianswill.novatv.core.player.UserProfileManager
 import com.willianswill.novatv.core.parser.StreamingXmltvParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,7 @@ import java.io.InputStream
 
 class IptvRepository(context: Context) {
 
+    private val appContext = context.applicationContext
     private val db = NovaTvDatabase.getInstance(context)
     private val profileDao = db.profileDao()
     private val categoryDao = db.categoryDao()
@@ -122,19 +124,19 @@ class IptvRepository(context: Context) {
         streamDao.observeRecentlyAdded(profileId, mediaType, includeAdult)
 
     fun observeContinueWatching(profileId: Long) =
-        historyDao.observeContinueWatching(profileId)
+        historyDao.observeContinueWatching(profileId, UserProfileManager.getActiveUserId(appContext))
 
     fun observeHistoryByType(profileId: Long, mediaType: String) =
-        historyDao.observeByMediaType(profileId, mediaType)
+        historyDao.observeByMediaType(profileId, UserProfileManager.getActiveUserId(appContext), mediaType)
 
     suspend fun getWatchProgress(profileId: Long, contentKey: String) =
         withContext(Dispatchers.IO) {
-            historyDao.getProgress(profileId, contentKey)
+            historyDao.getProgress(profileId, UserProfileManager.getActiveUserId(appContext), contentKey)
         }
 
     suspend fun getSeriesHistory(profileId: Long, seriesId: String) =
         withContext(Dispatchers.IO) {
-            historyDao.getBySeriesId(profileId, seriesId)
+            historyDao.getBySeriesId(profileId, UserProfileManager.getActiveUserId(appContext), seriesId)
         }
 
     suspend fun toggleStreamFavorite(id: Long, isFavorite: Boolean) = withContext(Dispatchers.IO) {

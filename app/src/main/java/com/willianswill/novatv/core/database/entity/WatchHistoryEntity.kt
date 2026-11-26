@@ -7,13 +7,14 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "watch_history",
     indices = [
-        Index(value = ["profileId", "contentKey"], unique = true),
-        Index(value = ["profileId", "updatedAt"])
+        Index(value = ["profileId", "userProfileId", "contentKey"], unique = true),
+        Index(value = ["profileId", "userProfileId", "updatedAt"])
     ]
 )
 data class WatchHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val profileId: Long,
+    val userProfileId: Long = 1L,
     val contentKey: String,
     val mediaType: String,
     val title: String,

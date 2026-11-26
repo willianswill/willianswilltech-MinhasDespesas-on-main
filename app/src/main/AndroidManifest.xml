@@ -29,7 +29,7 @@
         tools:targetApi="31">
 
         <activity
-            android:name=".feature.home.HomeActivity"
+            android:name=".feature.profiles.ProfilePickerActivity"
             android:configChanges="screenSize|screenLayout|orientation|keyboardHidden"
             android:exported="true"
             android:launchMode="singleTop">
@@ -39,6 +39,12 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".feature.home.HomeActivity"
+            android:configChanges="screenSize|screenLayout|orientation|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTop" />
 
         <activity
             android:name=".feature.playlists.PlaylistsActivity"

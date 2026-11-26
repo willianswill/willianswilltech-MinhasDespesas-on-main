@@ -22,10 +22,12 @@ import com.willianswill.novatv.core.player.AppPreferences
 import com.willianswill.novatv.core.player.MultiViewActivity
 import com.willianswill.novatv.core.player.PlayableItem
 import com.willianswill.novatv.core.player.PlayerActivity
+import com.willianswill.novatv.core.player.UserProfileManager
 import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ActivityHomeBinding
 import com.willianswill.novatv.feature.livetv.LiveTvActivity
 import com.willianswill.novatv.feature.playlists.PlaylistsActivity
+import com.willianswill.novatv.feature.profiles.ProfilePickerActivity
 import com.willianswill.novatv.feature.settings.SettingsActivity
 import com.willianswill.novatv.feature.vod.VodCatalogActivity
 import kotlinx.coroutines.Job
@@ -63,6 +65,14 @@ class HomeActivity : AppCompatActivity() {
         setupNavigation()
         observeActiveProfile()
         checkAppUpdateOnStartup()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        prefs = AppPreferences(this)
+        val user = UserProfileManager.getActiveUser(this)
+        val avatar = UserProfileManager.getAvatar(user.avatarId)
+        binding.btnSwitchProfile.text = "${avatar.emoji} ${user.name}"
     }
 
     private fun setupCarousels() {
@@ -133,6 +143,11 @@ class HomeActivity : AppCompatActivity() {
         binding.btnHeroPlay.setOnClickListener {
             val item = heroPlayable ?: return@setOnClickListener
             launchPlayer(listOf(item), 0)
+        }
+
+        binding.btnSwitchProfile.setOnClickListener {
+            startActivity(Intent(this, ProfilePickerActivity::class.java))
+            finish()
         }
 
         binding.btnPlaylists.setOnClickListener {

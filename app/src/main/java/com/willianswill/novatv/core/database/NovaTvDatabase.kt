@@ -26,7 +26,7 @@ import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
         EpgProgramEntity::class,
         WatchHistoryEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class NovaTvDatabase : RoomDatabase() {

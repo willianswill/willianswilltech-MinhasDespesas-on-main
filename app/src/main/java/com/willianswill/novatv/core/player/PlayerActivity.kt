@@ -858,11 +858,13 @@ class PlayerActivity : AppCompatActivity() {
         val dur = exo.duration.coerceAtLeast(0L)
         if (item.mediaType != MediaType.LIVE && pos < 5_000L) return
 
+        val activeUserId = UserProfileManager.getActiveUserId(this)
         CoroutineScope(Dispatchers.IO).launch {
             val profile = repository.observeActiveProfile().firstOrNull() ?: return@launch
             repository.upsertWatchProgress(
                 WatchHistoryEntity(
                     profileId = profile.id,
+                    userProfileId = activeUserId,
                     contentKey = item.contentKey,
                     mediaType = item.mediaType,
                     title = item.title,

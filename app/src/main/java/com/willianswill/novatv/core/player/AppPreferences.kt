@@ -33,8 +33,12 @@ enum class BufferProfile(
     )
 }
 
+/**
+ * Preferências isoladas por Perfil de Usuário (cada perfil tem seu buffer, User-Agent, PIN e controle adulto).
+ */
 class AppPreferences(context: Context) {
-    private val prefs = context.getSharedPreferences("novatv_settings", Context.MODE_PRIVATE)
+    private val userId = UserProfileManager.getActiveUserId(context)
+    private val prefs = context.getSharedPreferences("novatv_user_prefs_$userId", Context.MODE_PRIVATE)
 
     var bufferProfile: BufferProfile
         get() {
