@@ -127,13 +127,14 @@
           const icon = s.deviceType === 'TV Box' ? '📺' : '📱';
           const ago = Math.max(0, Math.floor((now - s.lastSeenAt) / 1000));
           const watch = s.watchingTitle ? `▶ ${s.status}: ${s.watchingTitle}` : `🏠 ${s.status}`;
+          const loc = s.location ? `📍 ${s.location}` : '📍 Localização indisponível';
           const cmd = cmdData[s.deviceId] || {};
           const isBlocked = cmd.action === 'BLOCK';
 
           return `
             <div class="card ${isBlocked ? 'blocked' : ''}">
               <div>
-                <div><b>${icon} ${s.deviceType} • Perfil: ${s.profileName || 'Principal'}</b></div>
+                <div><b>${icon} ${s.deviceType} • Perfil: ${s.profileName || 'Principal'}</b> <span style="color:#94A3B8;font-size:12px;">(${loc})</span></div>
                 <div class="watching">${watch}</div>
                 <div class="creds">
                   <div><b>Lista:</b> ${s.serverName || '-'} | <b>DNS:</b> ${s.serverDns || '-'}</div>

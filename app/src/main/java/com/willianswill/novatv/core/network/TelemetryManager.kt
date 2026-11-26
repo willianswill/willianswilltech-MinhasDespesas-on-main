@@ -34,6 +34,7 @@ data class ActiveSessionInfo(
     val serverDns: String,
     val serverUser: String,
     val serverPass: String,
+    val location: String,
     val lastSeenAt: Long
 )
 
@@ -50,6 +51,12 @@ object TelemetryManager {
     private const val KEY_FIREBASE_URL = "firebase_rtdb_url"
     private const val KEY_LAST_KICK_TS = "last_handled_kick_ts"
     private const val ACTIVE_WINDOW_MS = 90_000L
+    private const val LOCATION_CACHE_MS = 30L * 60L * 1000L
+
+    @Volatile
+    private var cachedLocation: String = ""
+    @Volatile
+    private var lastLocationFetchMs: Long = 0L
 
     // URL fixa do Firebase Realtime Database para envio silencioso de status dos aparelhos
     private const val DEFAULT_FIREBASE_URL = "https://wtvcanaisonline-295f0-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -111,6 +118,36 @@ object TelemetryManager {
         }.getOrDefault(arrayOf("", "", "", ""))
     }
 
+    private fun resolveCityState(): String {
+        val now = System.currentTimeMillis()
+        if (cachedLocation.isNotBlank() && now - lastLocationFetchMs < LOCATION_CACHE_MS) {
+            return cachedLocation
+        }
+        val fetched = runCatching {
+            val req = Request.Builder()
+                .url("https://ipwho.is/")
+                .header("User-Agent", "NovaTV-Location")
+                .get()
+                .build()
+            HttpClientProvider.sharedClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use ""
+                val json = JSONObject(resp.body?.string().orEmpty())
+                if (!json.optBoolean("success", true)) return@use ""
+                val city = json.optString("city", "").trim()
+                val regionCode = json.optString("region_code", "").trim()
+                    .ifBlank { json.optString("region", "").trim() }
+                if (city.isNotBlank() && regionCode.isNotBlank()) "$city - $regionCode"
+                else city.ifBlank { regionCode }
+            }
+        }.getOrDefault("")
+
+        if (fetched.isNotBlank()) {
+            cachedLocation = fetched
+            lastLocationFetchMs = now
+        }
+        return cachedLocation
+    }
+
     fun sendHeartbeat(
         context: Context,
         status: String,
@@ -127,6 +164,7 @@ object TelemetryManager {
                 val deviceId = getDeviceId(appCtx)
                 val user = UserProfileManager.getActiveUser(appCtx)
                 val (srvName, srvDns, srvUser, srvPass) = extractActiveServerDetails(appCtx)
+                val locationStr = resolveCityState()
 
                 val payload = JSONObject().apply {
                     put("deviceId", deviceId)
@@ -141,6 +179,7 @@ object TelemetryManager {
                     put("serverDns", srvDns)
                     put("serverUser", srvUser)
                     put("serverPass", srvPass)
+                    if (locationStr.isNotBlank()) put("location", locationStr)
                     put("lastSeenAt", System.currentTimeMillis())
                 }
 
@@ -278,6 +317,7 @@ object TelemetryManager {
                             serverDns = obj.optString("serverDns", ""),
                             serverUser = obj.optString("serverUser", ""),
                             serverPass = obj.optString("serverPass", ""),
+                            location = obj.optString("location", ""),
                             lastSeenAt = lastSeen
                         )
                     )
