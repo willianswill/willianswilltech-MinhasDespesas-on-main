@@ -38,6 +38,7 @@ import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.ProfileType
 import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
 import com.willianswill.novatv.core.network.XtreamApiClient
+import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ActivityPlayerBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,7 +54,7 @@ class PlayerActivity : AppCompatActivity() {
         const val EXTRA_ITEMS = "extra_items"
         const val EXTRA_INDEX = "extra_index"
         private const val MAX_RETRY = 5
-        private const val AUTO_HIDE_MS = 5000L
+        private const val AUTO_HIDE_MS = 4000L
     }
 
     private lateinit var binding: ActivityPlayerBinding
@@ -77,6 +78,14 @@ class PlayerActivity : AppCompatActivity() {
     private var lastReadyAtMs = 0L
     private var overlayAdapter: PlayerChannelOverlayAdapter? = null
     private val hideGestureRunnable = Runnable { binding.tvGestureFeedback.visibility = View.GONE }
+    private var pendingSeekTargetMs = -1L
+    private var progressiveSeekDeltaMs = 0L
+    private var saveTickCount = 0
+    private val autoNextRunnable = Runnable {
+        if (currentIndex + 1 < items.size) {
+            switchToIndex(currentIndex + 1)
+        }
+    }
 
     private val resizeModes = listOf(
         AspectRatioFrameLayout.RESIZE_MODE_FIT to "Ajustar",
@@ -242,6 +251,28 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun setupUiActions() {
+        listOf(
+            binding.btnBack, binding.btnPrev, binding.btnPlayPause, binding.btnNext,
+            binding.btnTracks, binding.btnQuality, binding.btnAspect, binding.btnReload,
+            binding.btnChannelList, binding.btnRecall, binding.btnNextEpisode,
+            binding.btnCatchup, binding.btnMultiview, binding.btnPip,
+            binding.btnQpAudio, binding.btnQpSubtitles, binding.btnQpEpisodes, binding.btnQpClose
+        ).forEach { it.enableCinemaFocusZoom(1.06f) }
+
+        binding.btnQpAudio.setOnClickListener {
+            closeQuickPanel()
+            showAudioOnlyDialog()
+        }
+        binding.btnQpSubtitles.setOnClickListener {
+            closeQuickPanel()
+            showSubtitlesOnlyDialog()
+        }
+        binding.btnQpEpisodes.setOnClickListener {
+            closeQuickPanel()
+            openChannelDrawer()
+        }
+        binding.btnQpClose.setOnClickListener { closeQuickPanel() }
+
         binding.btnBack.setOnClickListener { finish() }
         binding.btnChannelList.setOnClickListener { openChannelDrawer() }
         binding.btnCloseDrawer.setOnClickListener { closeChannelDrawer() }
@@ -413,8 +444,11 @@ class PlayerActivity : AppCompatActivity() {
                     Player.STATE_ENDED -> {
                         hideLoading()
                         if (item.mediaType == MediaType.SERIES && currentIndex + 1 < items.size) {
+                            binding.btnNextEpisode.text = "▶ Próximo Episódio (3s)"
                             binding.btnNextEpisode.visibility = View.VISIBLE
                             binding.btnNextEpisode.requestFocus()
+                            handler.removeCallbacks(autoNextRunnable)
+                            handler.postDelayed(autoNextRunnable, 3000L)
                         } else if (item.mediaType == MediaType.LIVE && overrideCatchupUrl == null && prefs.autoReconnect) {
                             scheduleRetry()
                         }
@@ -592,6 +626,84 @@ class PlayerActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun isVodPlayback(): Boolean {
+        val item = items.getOrNull(currentIndex) ?: return false
+        return item.mediaType != MediaType.LIVE || overrideCatchupUrl != null
+    }
+
+    private fun openQuickPanel() {
+        hideControls()
+        val item = items.getOrNull(currentIndex)
+        binding.btnQpEpisodes.visibility = if (item?.mediaType == MediaType.SERIES && items.size > 1) View.VISIBLE else View.GONE
+        binding.vodQuickPanel.visibility = View.VISIBLE
+        binding.btnQpAudio.requestFocus()
+    }
+
+    private fun closeQuickPanel() {
+        binding.vodQuickPanel.visibility = View.GONE
+    }
+
+    private fun showAudioOnlyDialog() {
+        val exo = player ?: return
+        val audioTracks = TrackManager.getAudioTracks(exo)
+        if (audioTracks.isEmpty()) {
+            Toast.makeText(this, "Nenhuma faixa de áudio adicional encontrada.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = audioTracks.map { (if (it.isSelected) "✓ " else "") + it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Selecionar Áudio")
+            .setItems(labels) { _, which ->
+                TrackManager.selectTrack(exo, audioTracks[which], C.TRACK_TYPE_AUDIO)
+            }
+            .setNegativeButton("Fechar", null)
+            .show()
+    }
+
+    private fun showSubtitlesOnlyDialog() {
+        val exo = player ?: return
+        val subTracks = TrackManager.getSubtitleTracks(exo)
+        val labels = mutableListOf("Desativar Legendas")
+        val actions = mutableListOf<() -> Unit>({ TrackManager.disableSubtitles(exo) })
+        subTracks.forEach { tr ->
+            labels.add((if (tr.isSelected) "✓ " else "") + tr.label)
+            actions.add { TrackManager.selectTrack(exo, tr, C.TRACK_TYPE_TEXT) }
+        }
+        labels.add("+ Carregar Legenda Externa (.srt / .vtt)")
+        actions.add { pickSubtitleLauncher.launch(arrayOf("*/*")) }
+
+        AlertDialog.Builder(this)
+            .setTitle("Selecionar Legenda")
+            .setItems(labels.toTypedArray()) { _, which -> actions[which].invoke() }
+            .setNegativeButton("Fechar", null)
+            .show()
+    }
+
+    private fun togglePlayPauseAndShowOsd() {
+        val exo = player ?: return
+        if (exo.isPlaying) {
+            exo.pause()
+            binding.btnPlayPause.text = "▶ Retomar"
+            showGestureFeedback("⏸ Pausado")
+        } else {
+            exo.play()
+            binding.btnPlayPause.text = "⏸ Pausar"
+            showGestureFeedback("▶ Reproduzindo")
+        }
+        showControls(focusSeekBar = false)
+    }
+
+    private fun seekRelative(deltaMs: Long) {
+        val exo = player ?: return
+        if (!isVodPlayback() || exo.duration <= 0L) return
+        val target = (exo.currentPosition + deltaMs).coerceIn(0L, exo.duration)
+        exo.seekTo(target)
+        val sec = (deltaMs / 1000L)
+        val sign = if (sec >= 0) "+${sec}s ⏩" else "⏪ ${sec}s"
+        showGestureFeedback("$sign  (${formatDuration(target)})")
+        showControls(focusSeekBar = true)
+    }
+
     private fun showTracksDialog() {
         val exo = player ?: return
         val audioTracks = TrackManager.getAudioTracks(exo)
@@ -701,13 +813,26 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun updateSeekProgress() {
         val exo = player ?: return
-        if (!isSeeking && exo.duration > 0) {
-            binding.seekBar.progress = exo.currentPosition.toInt()
-            binding.tvPosTime.text = formatDuration(exo.currentPosition)
+        if (!isSeeking && pendingSeekTargetMs < 0L && exo.duration > 0) {
+            val pos = exo.currentPosition
+            val dur = exo.duration
+            val remaining = (dur - pos).coerceAtLeast(0L)
+            binding.seekBar.progress = pos.toInt()
+            binding.seekBar.secondaryProgress = ((dur * exo.bufferedPercentage) / 100L).toInt()
+            binding.tvPosTime.text = formatDuration(pos)
+            binding.tvDurTime.text = "-${formatDuration(remaining)}"
+            binding.tvBufferPercent.text = "Buffer: ${exo.bufferedPercentage}%"
+
             val item = items.getOrNull(currentIndex)
+            if (item != null && item.mediaType != MediaType.LIVE && exo.isPlaying) {
+                saveTickCount++
+                if (saveTickCount % 5 == 0) {
+                    saveCurrentWatchProgress()
+                }
+            }
             if (item?.mediaType == MediaType.SERIES && currentIndex + 1 < items.size) {
-                val remaining = exo.duration - exo.currentPosition
-                if (remaining in 1L..45_000L) {
+                if (remaining in 1L..30_000L) {
+                    binding.btnNextEpisode.text = "▶ Próximo Episódio (${remaining / 1000L}s)"
                     binding.btnNextEpisode.visibility = View.VISIBLE
                 }
             }
@@ -766,9 +891,13 @@ class PlayerActivity : AppCompatActivity() {
         if (binding.controlsOverlay.visibility == View.VISIBLE) hideControls() else showControls()
     }
 
-    private fun showControls() {
+    private fun showControls(focusSeekBar: Boolean = false) {
         binding.controlsOverlay.visibility = View.VISIBLE
-        binding.btnPlayPause.requestFocus()
+        if (focusSeekBar && isVodPlayback() && binding.seekContainer.visibility == View.VISIBLE) {
+            binding.seekBar.requestFocus()
+        } else {
+            binding.btnPlayPause.requestFocus()
+        }
         scheduleHideControls()
     }
 
@@ -782,52 +911,143 @@ class PlayerActivity : AppCompatActivity() {
         handler.postDelayed(hideControlsRunnable, AUTO_HIDE_MS)
     }
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && binding.controlsOverlay.visibility == View.VISIBLE) {
+            scheduleHideControls()
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        val repeatCount = event?.repeatCount ?: 0
+        val vod = isVodPlayback()
+
         return when (keyCode) {
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                togglePlayPauseAndShowOsd()
+                true
+            }
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                seekRelative(30_000L)
+                true
+            }
+            KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                seekRelative(-30_000L)
+                true
+            }
+            KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                if (currentIndex + 1 < items.size) {
+                    switchToIndex(currentIndex + 1)
+                    true
+                } else super.onKeyDown(keyCode, event)
+            }
             KeyEvent.KEYCODE_CHANNEL_UP -> { zap(1); true }
             KeyEvent.KEYCODE_CHANNEL_DOWN -> { zap(-1); true }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (binding.controlsOverlay.visibility != View.VISIBLE) {
-                    showControls()
+                if (binding.vodQuickPanel.visibility != View.VISIBLE &&
+                    binding.channelDrawer.visibility != View.VISIBLE &&
+                    (binding.controlsOverlay.visibility != View.VISIBLE || binding.seekBar.hasFocus())
+                ) {
+                    togglePlayPauseAndShowOsd()
                     true
                 } else {
-                    scheduleHideControls()
                     super.onKeyDown(keyCode, event)
                 }
             }
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                if (binding.controlsOverlay.visibility != View.VISIBLE) {
+                if (vod && (binding.controlsOverlay.visibility != View.VISIBLE || binding.seekBar.hasFocus())) {
+                    val exo = player ?: return true
+                    if (exo.duration <= 0L) return true
+                    val isRight = keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    val stepMs = when {
+                        repeatCount == 0 -> 10_000L
+                        repeatCount <= 4 -> 30_000L
+                        repeatCount <= 10 -> 60_000L
+                        else -> 120_000L
+                    }
+                    progressiveSeekDeltaMs += if (isRight) stepMs else -stepMs
+                    val target = (exo.currentPosition + progressiveSeekDeltaMs).coerceIn(0L, exo.duration)
+                    pendingSeekTargetMs = target
+                    binding.seekBar.progress = target.toInt()
+                    binding.tvPosTime.text = formatDuration(target)
+                    val deltaSec = progressiveSeekDeltaMs / 1000L
+                    val arrow = if (deltaSec >= 0) "⏩ +${deltaSec}s" else "⏪ ${deltaSec}s"
+                    binding.tvGestureFeedback.text = "$arrow  •  ${formatDuration(target)}"
+                    binding.tvGestureFeedback.visibility = View.VISIBLE
+                    handler.removeCallbacks(hideGestureRunnable)
+                    true
+                } else if (!vod && binding.controlsOverlay.visibility != View.VISIBLE) {
                     zap(if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1)
                     true
                 } else {
-                    scheduleHideControls()
                     super.onKeyDown(keyCode, event)
                 }
             }
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (binding.channelDrawer.visibility != View.VISIBLE &&
-                    binding.controlsOverlay.visibility != View.VISIBLE &&
-                    items.size > 1
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                if (binding.controlsOverlay.visibility != View.VISIBLE &&
+                    binding.channelDrawer.visibility != View.VISIBLE &&
+                    binding.vodQuickPanel.visibility != View.VISIBLE
                 ) {
-                    openChannelDrawer()
+                    showControls(focusSeekBar = vod)
                     true
                 } else {
                     super.onKeyDown(keyCode, event)
                 }
             }
-            KeyEvent.KEYCODE_BACK -> {
-                if (binding.channelDrawer.visibility == View.VISIBLE) {
-                    closeChannelDrawer()
-                    true
-                } else if (binding.controlsOverlay.visibility == View.VISIBLE) {
-                    hideControls()
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (binding.controlsOverlay.visibility != View.VISIBLE &&
+                    binding.channelDrawer.visibility != View.VISIBLE &&
+                    binding.vodQuickPanel.visibility != View.VISIBLE
+                ) {
+                    if (vod) {
+                        openQuickPanel()
+                    } else if (items.size > 1) {
+                        openChannelDrawer()
+                    }
                     true
                 } else {
                     super.onKeyDown(keyCode, event)
+                }
+            }
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+                handler.removeCallbacks(autoNextRunnable)
+                when {
+                    binding.vodQuickPanel.visibility == View.VISIBLE -> {
+                        closeQuickPanel()
+                        true
+                    }
+                    binding.channelDrawer.visibility == View.VISIBLE -> {
+                        closeChannelDrawer()
+                        true
+                    }
+                    binding.controlsOverlay.visibility == View.VISIBLE -> {
+                        hideControls()
+                        true
+                    }
+                    else -> {
+                        player?.pause()
+                        saveCurrentWatchProgress()
+                        finish()
+                        true
+                    }
                 }
             }
             else -> super.onKeyDown(keyCode, event)
         }
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if ((keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) &&
+            pendingSeekTargetMs >= 0L
+        ) {
+            player?.seekTo(pendingSeekTargetMs)
+            pendingSeekTargetMs = -1L
+            progressiveSeekDeltaMs = 0L
+            handler.removeCallbacks(hideGestureRunnable)
+            handler.postDelayed(hideGestureRunnable, 1200L)
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     private fun releasePlayer() {

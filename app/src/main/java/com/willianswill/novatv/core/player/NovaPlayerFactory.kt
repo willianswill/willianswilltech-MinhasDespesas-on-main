@@ -11,6 +11,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import com.willianswill.novatv.core.network.HttpClientProvider
@@ -62,7 +63,10 @@ object NovaPlayerFactory {
             .setMediaSourceFactory(mediaSourceFactory)
             .setBandwidthMeter(getBandwidthMeter(context))
             .setWakeMode(C.WAKE_MODE_NETWORK)
-            .build()
+            .build().apply {
+                // Seek rápido para o keyframe mais próximo sem travar a UI durante múltiplos seeks
+                setSeekParameters(SeekParameters.CLOSEST_SYNC)
+            }
     }
 
     fun buildMediaItem(

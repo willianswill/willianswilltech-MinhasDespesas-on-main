@@ -123,6 +123,67 @@
         android:textSize="13sp"
         android:visibility="gone" />
 
+    <!-- Quick Bottom Panel (DPAD_DOWN: Áudio, Legendas, Episódios) -->
+    <LinearLayout
+        android:id="@+id/vod_quick_panel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/bg_player_pill"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btn_qp_audio"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="42dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/selector_player_btn"
+            android:focusable="true"
+            android:paddingHorizontal="14dp"
+            android:text="🔊 Áudio"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btn_qp_subtitles"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="42dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/selector_player_btn"
+            android:focusable="true"
+            android:paddingHorizontal="14dp"
+            android:text="💬 Legendas"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btn_qp_episodes"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="42dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/selector_player_btn"
+            android:focusable="true"
+            android:paddingHorizontal="14dp"
+            android:text="☰ Episódios"
+            android:textColor="#38BDF8" />
+
+        <Button
+            android:id="@+id/btn_qp_close"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="42dp"
+            android:background="@drawable/selector_player_btn"
+            android:focusable="true"
+            android:paddingHorizontal="12dp"
+            android:text="✕"
+            android:textColor="#94A3B8" />
+    </LinearLayout>
+
     <!-- OSD Controls Overlay -->
     <RelativeLayout
         android:id="@+id/controls_overlay"
@@ -245,7 +306,8 @@
                     android:layout_height="wrap_content"
                     android:text="00:00"
                     android:textColor="#E2E8F0"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <SeekBar
                     android:id="@+id/seek_bar"
@@ -253,16 +315,30 @@
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="8dp"
                     android:layout_weight="1"
+                    android:focusable="true"
+                    android:paddingVertical="6dp"
+                    android:progressBackgroundTint="#334155"
                     android:progressTint="#38BDF8"
+                    android:secondaryProgressTint="#64748B"
                     android:thumbTint="#38BDF8" />
 
                 <TextView
                     android:id="@+id/tv_dur_time"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="00:00"
+                    android:text="-00:00"
                     android:textColor="#94A3B8"
                     android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tv_buffer_percent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:text="Buffer: 0%"
+                    android:textColor="#34D399"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Action Buttons Row -->
