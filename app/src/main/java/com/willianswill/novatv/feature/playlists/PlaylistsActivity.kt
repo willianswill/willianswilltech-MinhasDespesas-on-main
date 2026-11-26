@@ -101,12 +101,13 @@ class PlaylistsActivity : AppCompatActivity() {
 
     private fun setupActions() {
         listOf(
-            binding.btnBack, binding.tabXtream, binding.tabM3u,
+            binding.btnBack, binding.btnPullMacPlaylist, binding.tabXtream, binding.tabM3u,
             binding.tabStalker, binding.btnConnectSave, binding.btnPickLocalM3u
         ).forEach { it.enableCinemaFocusZoom(1.05f) }
         binding.tabXtream.post { binding.tabXtream.requestFocus() }
 
         binding.btnBack.setOnClickListener { finish() }
+        binding.btnPullMacPlaylist.setOnClickListener { pullPlaylistByMac() }
         binding.btnPickLocalM3u.setOnClickListener { pickM3uLauncher.launch(arrayOf("*/*")) }
 
         binding.btnConnectSave.setOnClickListener {
@@ -273,6 +274,51 @@ class PlaylistsActivity : AppCompatActivity() {
                     setBusy(false)
                     Toast.makeText(this@PlaylistsActivity, "Erro Stalker: ${e.message}", Toast.LENGTH_LONG).show()
                 }
+            }
+        }
+    }
+
+    private fun pullPlaylistByMac() {
+        val mac = com.willianswill.novatv.core.network.TelemetryManager.getDeviceMac(this)
+        setBusy(true, "Buscando lista para MAC $mac...")
+        lifecycleScope.launch {
+            try {
+                val remote = com.willianswill.novatv.core.network.TelemetryManager.fetchRemoteMacPlaylist(this@PlaylistsActivity)
+                if (remote == null) {
+                    setBusy(false)
+                    Toast.makeText(
+                        this@PlaylistsActivity,
+                        "Nenhuma lista enviada para o MAC $mac.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return@launch
+                }
+                val profile = ProfileEntity(
+                    name = remote.name,
+                    type = ProfileType.M3U_URL.name,
+                    serverUrl = remote.m3uUrl
+                )
+                val savedId = repository.saveProfile(profile, activate = true)
+                val synced = try {
+                    repository.syncActiveProfile()
+                } catch (e: Exception) {
+                    repository.deleteProfile(savedId)
+                    throw e
+                }
+                com.willianswill.novatv.core.network.TelemetryManager.markMacPlaylistApplied(
+                    this@PlaylistsActivity,
+                    remote.updatedAt
+                )
+                setBusy(false)
+                Toast.makeText(
+                    this@PlaylistsActivity,
+                    "Lista ${remote.name} carregada (${synced?.totalChannels ?: 0} canais)!",
+                    Toast.LENGTH_LONG
+                ).show()
+                finish()
+            } catch (e: Exception) {
+                setBusy(false)
+                Toast.makeText(this@PlaylistsActivity, "Erro lista MAC: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

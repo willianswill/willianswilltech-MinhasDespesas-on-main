@@ -343,23 +343,26 @@ object TelemetryManager {
         if (baseUrl.isBlank()) return@withContext null
         val macKey = getDeviceMacKey(context)
         val authQuery = resolveAnonAuthQuery(context)
-        runCatching {
-            val req = Request.Builder()
-                .url("$baseUrl/mac_playlists/$macKey.json$authQuery")
-                .get()
-                .build()
-            HttpClientProvider.sharedClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@use null
-                val raw = resp.body?.string().orEmpty()
-                if (raw.isBlank() || raw == "null") return@use null
-                val json = JSONObject(raw)
-                val url = json.optString("m3uUrl", "").trim()
-                if (url.isBlank()) return@use null
-                val name = json.optString("name", "").trim().ifBlank { "Lista via MAC" }
-                val updatedAt = json.optLong("updatedAt", 0L)
-                RemoteMacPlaylist(name = name, m3uUrl = url, updatedAt = updatedAt)
+        val req = Request.Builder()
+            .url("$baseUrl/mac_playlists/$macKey.json$authQuery")
+            .get()
+            .build()
+        HttpClientProvider.sharedClient.newCall(req).execute().use { resp ->
+            if (resp.code == 401 || resp.code == 403) {
+                throw IllegalStateException("Permissão negada no Firebase (${resp.code}). Libere 'mac_playlists' nas Regras.")
             }
-        }.getOrNull()
+            if (!resp.isSuccessful) {
+                throw IllegalStateException("Erro Firebase HTTP ${resp.code}")
+            }
+            val raw = resp.body?.string().orEmpty()
+            if (raw.isBlank() || raw == "null") return@withContext null
+            val json = JSONObject(raw)
+            val url = json.optString("m3uUrl", "").trim()
+            if (url.isBlank()) return@withContext null
+            val name = json.optString("name", "").trim().ifBlank { "Lista via MAC" }
+            val updatedAt = json.optLong("updatedAt", 0L)
+            RemoteMacPlaylist(name = name, m3uUrl = url, updatedAt = updatedAt)
+        }
     }
 
     fun getLastAppliedMacPlaylistTs(context: Context): Long =

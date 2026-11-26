@@ -298,26 +298,60 @@ class HomeActivity : AppCompatActivity() {
                     Toast.LENGTH_LONG
                 ).show()
 
-                val profile = ProfileEntity(
-                    name = remote.name,
-                    type = ProfileType.M3U_URL.name,
-                    serverUrl = remote.m3uUrl
-                )
-                repository.saveProfile(profile, activate = true)
-                val synced = repository.syncActiveProfile()
+                val parsedUri = Uri.parse(remote.m3uUrl)
+                val xtreamUser = parsedUri.getQueryParameter("username")?.trim().orEmpty()
+                val xtreamPass = parsedUri.getQueryParameter("password")?.trim().orEmpty()
+                val baseServer = if (parsedUri.scheme != null && parsedUri.host != null) {
+                    val portPart = if (parsedUri.port != -1) ":${parsedUri.port}" else ""
+                    "${parsedUri.scheme}://${parsedUri.host}$portPart"
+                } else ""
+
+                var synced: ProfileEntity? = null
+                var savedId = 0L
+
+                if (xtreamUser.isNotBlank() && xtreamPass.isNotBlank() && baseServer.isNotBlank()) {
+                    val xtreamProfile = ProfileEntity(
+                        name = remote.name,
+                        type = ProfileType.XTREAM.name,
+                        serverUrl = baseServer,
+                        username = xtreamUser,
+                        password = xtreamPass
+                    )
+                    savedId = repository.saveProfile(xtreamProfile, activate = true)
+                    synced = runCatching { repository.syncActiveProfile() }.getOrNull()
+                    if (synced == null || (synced.totalChannels == 0 && synced.totalMovies == 0 && synced.totalSeries == 0)) {
+                        repository.deleteProfile(savedId)
+                        savedId = 0L
+                        synced = null
+                    }
+                }
+
+                if (synced == null) {
+                    val m3uProfile = ProfileEntity(
+                        name = remote.name,
+                        type = ProfileType.M3U_URL.name,
+                        serverUrl = remote.m3uUrl
+                    )
+                    savedId = repository.saveProfile(m3uProfile, activate = true)
+                    try {
+                        synced = repository.syncActiveProfile()
+                    } catch (syncErr: Exception) {
+                        repository.deleteProfile(savedId)
+                        throw syncErr
+                    }
+                }
+
                 if (synced != null && synced.epgUrl.isNotBlank()) {
                     runCatching { repository.syncEpgForProfile(synced) }
                 }
                 TelemetryManager.markMacPlaylistApplied(this@HomeActivity, remote.updatedAt)
                 Toast.makeText(
                     this@HomeActivity,
-                    "Lista ${remote.name} pronta (${synced?.totalChannels ?: 0} canais)!",
+                    "Lista ${remote.name} pronta (${synced?.totalChannels ?: 0} canais, ${synced?.totalMovies ?: 0} filmes)!",
                     Toast.LENGTH_LONG
                 ).show()
             } catch (e: Exception) {
-                if (manual) {
-                    Toast.makeText(this@HomeActivity, "Erro ao baixar lista: ${e.message}", Toast.LENGTH_LONG).show()
-                }
+                Toast.makeText(this@HomeActivity, "Erro lista MAC: ${e.message}", Toast.LENGTH_LONG).show()
             } finally {
                 macPlaylistSyncRunning = false
             }
