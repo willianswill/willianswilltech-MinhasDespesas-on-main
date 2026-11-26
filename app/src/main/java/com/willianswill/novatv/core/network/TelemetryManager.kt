@@ -5,6 +5,7 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.pm.PackageInfoCompat
@@ -19,6 +20,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.net.NetworkInterface
+import java.security.MessageDigest
+import java.util.Locale
 import java.util.UUID
 
 data class ActiveSessionInfo(
@@ -44,12 +48,20 @@ data class RemoteCommand(
     val reason: String
 )
 
+data class RemoteMacPlaylist(
+    val name: String,
+    val m3uUrl: String,
+    val updatedAt: Long
+)
+
 object TelemetryManager {
 
     private const val PREFS_NAME = "novatv_telemetry_prefs"
     private const val KEY_DEVICE_ID = "device_id"
+    private const val KEY_DEVICE_MAC = "device_mac"
     private const val KEY_FIREBASE_URL = "firebase_rtdb_url"
     private const val KEY_LAST_KICK_TS = "last_handled_kick_ts"
+    private const val KEY_LAST_MAC_PLAYLIST_TS = "last_applied_mac_playlist_ts"
     private const val ACTIVE_WINDOW_MS = 90_000L
     private const val LOCATION_CACHE_MS = 30L * 60L * 1000L
 
@@ -84,6 +96,55 @@ object TelemetryManager {
             prefs.edit().putString(KEY_DEVICE_ID, id).apply()
         }
         return id
+    }
+
+    fun getDeviceMac(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val cached = prefs.getString(KEY_DEVICE_MAC, null)
+        if (!cached.isNullOrBlank()) return cached
+
+        val hwMac = readHardwareMacAddress()
+        val resolved = if (!hwMac.isNullOrBlank()) {
+            hwMac
+        } else {
+            val androidId = runCatching {
+                Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+            }.getOrNull().orEmpty().ifBlank { getDeviceId(context) }
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest(androidId.toByteArray(Charsets.UTF_8))
+            (0 until 6).joinToString(":") { i ->
+                String.format(Locale.US, "%02X", digest[i].toInt() and 0xFF)
+            }
+        }
+        prefs.edit().putString(KEY_DEVICE_MAC, resolved).apply()
+        return resolved
+    }
+
+    fun getDeviceMacKey(context: Context): String =
+        getDeviceMac(context).replace(":", "").replace("-", "").trim().uppercase(Locale.US)
+
+    private fun readHardwareMacAddress(): String? {
+        return runCatching {
+            val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+            val preferred = interfaces.sortedBy { iface ->
+                when (iface.name.lowercase(Locale.US)) {
+                    "eth0" -> 0
+                    "wlan0" -> 1
+                    else -> 2
+                }
+            }
+            for (iface in preferred) {
+                val bytes = iface.hardwareAddress ?: continue
+                if (bytes.size != 6) continue
+                val formatted = bytes.joinToString(":") { b ->
+                    String.format(Locale.US, "%02X", b.toInt() and 0xFF)
+                }
+                if (formatted != "02:00:00:00:00:00" && formatted != "00:00:00:00:00:00") {
+                    return@runCatching formatted
+                }
+            }
+            null
+        }.getOrNull()
     }
 
     private fun getDeviceType(context: Context): String {
@@ -169,6 +230,7 @@ object TelemetryManager {
 
                 val payload = JSONObject().apply {
                     put("deviceId", deviceId)
+                    put("deviceMac", getDeviceMac(appCtx))
                     put("deviceName", "${Build.MANUFACTURER} ${Build.MODEL}".trim())
                     put("deviceType", getDeviceType(appCtx))
                     put("profileName", user.name)
@@ -273,6 +335,41 @@ object TelemetryManager {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putLong(KEY_LAST_KICK_TS, issuedAt)
+            .apply()
+    }
+
+    suspend fun fetchRemoteMacPlaylist(context: Context): RemoteMacPlaylist? = withContext(Dispatchers.IO) {
+        val baseUrl = getFirebaseUrl(context)
+        if (baseUrl.isBlank()) return@withContext null
+        val macKey = getDeviceMacKey(context)
+        val authQuery = resolveAnonAuthQuery(context)
+        runCatching {
+            val req = Request.Builder()
+                .url("$baseUrl/mac_playlists/$macKey.json$authQuery")
+                .get()
+                .build()
+            HttpClientProvider.sharedClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@use null
+                val raw = resp.body?.string().orEmpty()
+                if (raw.isBlank() || raw == "null") return@use null
+                val json = JSONObject(raw)
+                val url = json.optString("m3uUrl", "").trim()
+                if (url.isBlank()) return@use null
+                val name = json.optString("name", "").trim().ifBlank { "Lista via MAC" }
+                val updatedAt = json.optLong("updatedAt", 0L)
+                RemoteMacPlaylist(name = name, m3uUrl = url, updatedAt = updatedAt)
+            }
+        }.getOrNull()
+    }
+
+    fun getLastAppliedMacPlaylistTs(context: Context): Long =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getLong(KEY_LAST_MAC_PLAYLIST_TS, 0L)
+
+    fun markMacPlaylistApplied(context: Context, updatedAt: Long) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(KEY_LAST_MAC_PLAYLIST_TS, updatedAt)
             .apply()
     }
 

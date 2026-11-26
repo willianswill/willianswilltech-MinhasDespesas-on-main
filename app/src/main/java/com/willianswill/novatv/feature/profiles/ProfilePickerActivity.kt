@@ -61,7 +61,18 @@ class ProfilePickerActivity : AppCompatActivity() {
         }
 
         refreshProfiles()
+        setupDeviceMacBanner()
         verifyRemoteBlockStatus()
+    }
+
+    private fun setupDeviceMacBanner() {
+        val mac = TelemetryManager.getDeviceMac(this)
+        binding.tvDeviceMac.text = "📡 MAC do Aparelho: $mac"
+        binding.tvDeviceMac.setOnClickListener {
+            val cb = getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+            cb?.setPrimaryClip(android.content.ClipData.newPlainText("MAC", mac))
+            Toast.makeText(this, "MAC copiado: $mac", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun verifyRemoteBlockStatus() {

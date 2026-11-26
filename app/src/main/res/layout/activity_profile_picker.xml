@@ -30,10 +30,24 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:layout_marginBottom="20dp"
+        android:layout_marginBottom="10dp"
         android:text="Cada perfil mantém seu histórico, favoritos e configurações"
         android:textColor="@color/text_secondary"
         android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/tv_device_mac"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/selector_cinema_card"
+        android:focusable="true"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:text="📡 MAC do Aparelho: ..."
+        android:textColor="@color/accent_cyan"
+        android:textSize="14sp"
+        android:textStyle="bold" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_user_profiles"

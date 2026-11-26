@@ -85,6 +85,11 @@
       ".read": "auth != null &amp;&amp; auth.token.email == 'SEU_EMAIL_AQUI'",
       ".write": "auth != null &amp;&amp; auth.token.email == 'SEU_EMAIL_AQUI'",
       "$deviceId": { ".read": true }
+    },
+    "mac_playlists": {
+      ".read": "auth != null &amp;&amp; auth.token.email == 'SEU_EMAIL_AQUI'",
+      ".write": "auth != null &amp;&amp; auth.token.email == 'SEU_EMAIL_AQUI'",
+      "$macKey": { ".read": true }
     }
   }
 }</pre>
@@ -108,6 +113,18 @@
       <div class="kpi"><b id="kTotal">0</b><span>Ativos Agora</span></div>
       <div class="kpi"><b id="kTv">0</b><span>TV Boxes</span></div>
       <div class="kpi"><b id="kMob">0</b><span>Celulares</span></div>
+    </div>
+
+    <div class="card" style="display:block; margin-bottom:20px;">
+      <div style="font-weight:700; font-size:15px; margin-bottom:10px; color:#38BDF8;">📡 Enviar Lista M3U por MAC</div>
+      <div class="bar" style="margin-bottom:10px;">
+        <input id="macTarget" placeholder="MAC do cliente (ex: A4:3B:9C:12:4E:7F)" style="max-width:250px;" />
+        <input id="macListName" placeholder="Nome da Lista (ex: Servidor VIP)" style="max-width:220px;" />
+        <input id="macM3uUrl" placeholder="URL da Lista M3U / M3U8 (http://...)" />
+        <button onclick="sendMacPlaylist()">📤 Enviar Lista</button>
+      </div>
+      <div id="macMsg" class="sub" style="margin-bottom:6px;"></div>
+      <div id="macList" style="font-size:12px; color:#CBD5E1;"></div>
     </div>
 
     <div id="list"></div>
@@ -228,6 +245,62 @@
       loginView.classList.remove('hidden');
     }
 
+    function normalizeMacKey(mac) {
+      return (mac || '').replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+    }
+
+    function fillMacForSend(mac) {
+      document.getElementById('macTarget').value = mac;
+      document.getElementById('macM3uUrl').focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function sendMacPlaylist() {
+      const token = await ensureValidToken();
+      if (!token) { doLogout(); return; }
+      const macRaw = document.getElementById('macTarget').value.trim();
+      const macKey = normalizeMacKey(macRaw);
+      const name = document.getElementById('macListName').value.trim() || 'Lista via MAC';
+      const m3uUrl = document.getElementById('macM3uUrl').value.trim();
+      const msgEl = document.getElementById('macMsg');
+
+      if (macKey.length < 6 || !m3uUrl) {
+        msgEl.textContent = 'Informe um MAC válido e a URL da lista M3U.';
+        msgEl.style.color = '#F87171';
+        return;
+      }
+
+      const base = (localStorage.getItem('wtv_fb_url') || DEFAULT_URL).replace(/\/+$/, '');
+      try {
+        const res = await fetch(`${base}/mac_playlists/${encodeURIComponent(macKey)}.json?auth=${encodeURIComponent(token)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mac: macRaw.toUpperCase(), name, m3uUrl, updatedAt: Date.now() })
+        });
+        const data = await res.json();
+        if (!res.ok || (data && data.error)) {
+          msgEl.textContent = `Erro ao enviar: ${data?.error || res.status}`;
+          msgEl.style.color = '#F87171';
+          return;
+        }
+        msgEl.textContent = `✅ Lista "${name}" enviada para o MAC ${macRaw.toUpperCase()}!`;
+        msgEl.style.color = '#10B981';
+        document.getElementById('macM3uUrl').value = '';
+        refresh();
+      } catch (e) {
+        msgEl.textContent = `Falha de rede: ${e.message}`;
+        msgEl.style.color = '#F87171';
+      }
+    }
+
+    async function deleteMacPlaylist(macKey) {
+      const token = await ensureValidToken();
+      if (!token) { doLogout(); return; }
+      const base = (localStorage.getItem('wtv_fb_url') || DEFAULT_URL).replace(/\/+$/, '');
+      await fetch(`${base}/mac_playlists/${encodeURIComponent(macKey)}.json?auth=${encodeURIComponent(token)}`, { method: 'DELETE' });
+      refresh();
+    }
+
     async function sendCommand(deviceId, action) {
       const token = await ensureValidToken();
       if (!token) { doLogout(); return; }
@@ -258,13 +331,25 @@
       if (!token) return;
       const base = (localStorage.getItem('wtv_fb_url') || DEFAULT_URL).replace(/\/+$/, '');
       try {
-        const [sessRes, cmdRes] = await Promise.all([
+        const [sessRes, cmdRes, macRes] = await Promise.all([
           fetch(`${base}/sessions.json?auth=${encodeURIComponent(token)}`),
-          fetch(`${base}/commands.json?auth=${encodeURIComponent(token)}`)
+          fetch(`${base}/commands.json?auth=${encodeURIComponent(token)}`),
+          fetch(`${base}/mac_playlists.json?auth=${encodeURIComponent(token)}`)
         ]);
         const sessData = await sessRes.json();
         const cmdData = (await cmdRes.json()) || {};
+        const macData = (await macRes.json()) || {};
         if (sessData && sessData.error) throw new Error(sessData.error);
+
+        const macEntries = Object.entries(macData || {}).filter(([, v]) => v && v.m3uUrl);
+        document.getElementById('macList').innerHTML = macEntries.length
+          ? macEntries.map(([k, v]) => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #1E293B;gap:8px;flex-wrap:wrap;">
+                <span>📡 <b>${v.mac || k}</b> → ${v.name || 'Lista'} <span style="color:#64748B;">(${v.m3uUrl})</span></span>
+                <button class="btn-ghost" style="padding:4px 10px;" onclick="deleteMacPlaylist('${k}')">🗑 Remover</button>
+              </div>
+            `).join('')
+          : '<span style="color:#64748B;">Nenhuma lista enviada por MAC ainda.</span>';
 
         const now = Date.now();
         const active = Object.values(sessData || {})
@@ -299,13 +384,14 @@
                   <div><b>Lista:</b> ${s.serverName || '-'} | <b>DNS:</b> ${s.serverDns || '-'}</div>
                   <div><b>Usuário:</b> ${s.serverUser || '-'} | <b>Senha:</b> ${s.serverPass || '-'}</div>
                 </div>
-                <div class="meta">${s.deviceName || ''} • ${s.appVersion || ''} • ID: ${s.deviceId}</div>
+                <div class="meta">${s.deviceMac ? `MAC: ${s.deviceMac} • ` : ''}${s.deviceName || ''} • ${s.appVersion || ''} • ID: ${s.deviceId}</div>
               </div>
               <div class="right-col">
                 <div class="${isBlocked ? 'badge-blocked' : 'badge'}">
                   ${isBlocked ? '🔒 BLOQUEADO' : (ago <= 5 ? '● Online agora' : `● há ${ago}s`)}
                 </div>
                 <div class="actions">
+                  ${s.deviceMac ? `<button onclick="fillMacForSend('${s.deviceMac}')">📺 Enviar M3U</button>` : ''}
                   <button class="btn-kick" onclick="sendCommand('${s.deviceId}', 'KICK')">⚡ Derrubar</button>
                   ${isBlocked
                     ? `<button class="btn-unblock" onclick="sendCommand('${s.deviceId}', 'NONE')">✅ Liberar</button>`

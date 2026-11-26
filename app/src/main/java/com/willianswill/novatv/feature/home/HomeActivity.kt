@@ -15,6 +15,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
+import com.willianswill.novatv.core.database.entity.ProfileEntity
+import com.willianswill.novatv.core.database.entity.ProfileType
 import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
 import com.willianswill.novatv.core.network.AppUpdateChecker
 import com.willianswill.novatv.core.network.AppUpdateInfo
@@ -91,6 +93,7 @@ class HomeActivity : AppCompatActivity() {
         val avatar = UserProfileManager.getAvatar(user.avatarId)
         binding.btnSwitchProfile.text = "${avatar.emoji} ${user.name}"
         checkTelemetryHeartbeat()
+        checkAndApplyMacPlaylist(manual = false)
         bannerHandler.removeCallbacks(autoRotateBanner)
         bannerHandler.postDelayed(autoRotateBanner, 6000L)
     }
@@ -200,6 +203,11 @@ class HomeActivity : AppCompatActivity() {
         binding.btnPlaylists.enableCinemaFocusZoom(1.06f)
         binding.btnSettings.enableCinemaFocusZoom(1.06f)
         binding.btnAddFirstPlaylist.enableCinemaFocusZoom(1.05f)
+        binding.btnCheckMacPlaylist.enableCinemaFocusZoom(1.05f)
+        binding.tvHomeDeviceMac.text = "📡 MAC do Aparelho: ${TelemetryManager.getDeviceMac(this)}"
+        binding.btnCheckMacPlaylist.setOnClickListener {
+            checkAndApplyMacPlaylist(manual = true)
+        }
         binding.btnBannerPrev.enableCinemaFocusZoom(1.06f)
         binding.btnBannerNext.enableCinemaFocusZoom(1.06f)
 
@@ -263,6 +271,59 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
+    private var macPlaylistSyncRunning = false
+
+    private fun checkAndApplyMacPlaylist(manual: Boolean) {
+        if (macPlaylistSyncRunning) return
+        macPlaylistSyncRunning = true
+        lifecycleScope.launch {
+            try {
+                val remote = TelemetryManager.fetchRemoteMacPlaylist(this@HomeActivity)
+                if (remote == null) {
+                    if (manual) {
+                        Toast.makeText(
+                            this@HomeActivity,
+                            "Nenhuma lista enviada ainda para o MAC ${TelemetryManager.getDeviceMac(this@HomeActivity)}.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    return@launch
+                }
+                val lastTs = TelemetryManager.getLastAppliedMacPlaylistTs(this@HomeActivity)
+                if (!manual && remote.updatedAt <= lastTs) return@launch
+
+                Toast.makeText(
+                    this@HomeActivity,
+                    "Lista recebida via MAC (${remote.name})! Carregando canais...",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                val profile = ProfileEntity(
+                    name = remote.name,
+                    type = ProfileType.M3U_URL.name,
+                    serverUrl = remote.m3uUrl
+                )
+                repository.saveProfile(profile, activate = true)
+                val synced = repository.syncActiveProfile()
+                if (synced != null && synced.epgUrl.isNotBlank()) {
+                    runCatching { repository.syncEpgForProfile(synced) }
+                }
+                TelemetryManager.markMacPlaylistApplied(this@HomeActivity, remote.updatedAt)
+                Toast.makeText(
+                    this@HomeActivity,
+                    "Lista ${remote.name} pronta (${synced?.totalChannels ?: 0} canais)!",
+                    Toast.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                if (manual) {
+                    Toast.makeText(this@HomeActivity, "Erro ao baixar lista: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                macPlaylistSyncRunning = false
+            }
+        }
+    }
+
     private fun openServerSwitcherOrPlaylists() {
         lifecycleScope.launch {
             val profiles = repository.observeProfiles().firstOrNull().orEmpty()
@@ -305,7 +366,9 @@ class HomeActivity : AppCompatActivity() {
             repository.observeActiveProfile().collectLatest { profile ->
                 profileDataJob?.cancel()
                 if (profile == null) {
-                    binding.tvActiveProfile.text = "Nenhum servidor conectado"
+                    val mac = TelemetryManager.getDeviceMac(this@HomeActivity)
+                    binding.tvActiveProfile.text = "Nenhum servidor • MAC: $mac"
+                    binding.tvHomeDeviceMac.text = "📡 MAC do Aparelho: $mac"
                     binding.bannerNoProfile.visibility = View.VISIBLE
                     binding.heroCarouselContainer.visibility = View.GONE
                     binding.btnAddFirstPlaylist.post { binding.btnAddFirstPlaylist.requestFocus() }
