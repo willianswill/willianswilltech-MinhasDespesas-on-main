@@ -67,6 +67,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".feature.admin.ControlPanelActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".core.player.PlayerActivity"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
             android:exported="false"

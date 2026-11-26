@@ -37,6 +37,7 @@ import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.ProfileType
 import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
+import com.willianswill.novatv.core.network.TelemetryManager
 import com.willianswill.novatv.core.network.XtreamApiClient
 import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ActivityPlayerBinding
@@ -81,6 +82,7 @@ class PlayerActivity : AppCompatActivity() {
     private var pendingSeekTargetMs = -1L
     private var progressiveSeekDeltaMs = 0L
     private var saveTickCount = 0
+    private var heartbeatTickCount = 0
     private val autoNextRunnable = Runnable {
         if (currentIndex + 1 < items.size) {
             switchToIndex(currentIndex + 1)
@@ -491,6 +493,7 @@ class PlayerActivity : AppCompatActivity() {
         player = exo
 
         loadLiveEpgSubtitle(item)
+        sendPlaybackHeartbeat(item)
         handler.removeCallbacks(progressRunnable)
         handler.post(progressRunnable)
         if (isAutoQuality && activeVariants.size > 1 && overrideCatchupUrl == null) {
@@ -823,8 +826,29 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun sendPlaybackHeartbeat(item: PlayableItem) {
+        val statusLabel = when (item.mediaType) {
+            MediaType.MOVIE -> "Assistindo Filme"
+            MediaType.SERIES -> "Assistindo Série"
+            else -> "Assistindo TV"
+        }
+        TelemetryManager.sendHeartbeat(
+            context = this,
+            status = statusLabel,
+            watchingTitle = item.title,
+            watchingType = item.mediaType
+        )
+    }
+
     private fun updateSeekProgress() {
         val exo = player ?: return
+        val currentItem = items.getOrNull(currentIndex)
+        if (currentItem != null && exo.isPlaying) {
+            heartbeatTickCount++
+            if (heartbeatTickCount % 30 == 0) {
+                sendPlaybackHeartbeat(currentItem)
+            }
+        }
         if (!isSeeking && pendingSeekTargetMs < 0L && exo.duration > 0) {
             val pos = exo.currentPosition
             val dur = exo.duration

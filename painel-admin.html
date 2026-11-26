@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wtv Canais Online — Painel de Controle Ao Vivo</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #07090F; color: #F8FAFC; padding: 24px; }
+    .container { max-width: 980px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: 22px; }
+    .sub { color: #94A3B8; font-size: 13px; margin-bottom: 18px; }
+    .bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    input { flex: 1; min-width: 260px; padding: 10px 14px; border-radius: 10px; border: 1px solid #24304A; background: #101522; color: #fff; }
+    button { padding: 10px 18px; border-radius: 10px; border: none; background: #2563EB; color: #fff; font-weight: 700; cursor: pointer; }
+    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+    .kpi { background: #101522; border: 1px solid #24304A; border-radius: 14px; padding: 16px; text-align: center; }
+    .kpi b { display: block; font-size: 28px; color: #38BDF8; }
+    .kpi span { font-size: 12px; color: #94A3B8; }
+    .card { background: #101522; border: 1px solid #24304A; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .watching { color: #38BDF8; font-weight: 700; margin-top: 4px; font-size: 14px; }
+    .meta { color: #64748B; font-size: 12px; margin-top: 4px; }
+    .badge { color: #10B981; font-weight: 700; font-size: 12px; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Wtv Canais Online — Painel Ao Vivo</h1>
+    <div class="sub">Atualização automática a cada 5 segundos (considerando aparelhos ativos nos últimos 90s)</div>
+
+    <div class="bar">
+      <input id="fbUrl" placeholder="Cole aqui a URL do Firebase (ex: https://seu-app-default-rtdb.firebaseio.com)" />
+      <button onclick="saveUrl()">Conectar</button>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><b id="kTotal">0</b><span>Ativos Agora</span></div>
+      <div class="kpi"><b id="kTv">0</b><span>TV Boxes</span></div>
+      <div class="kpi"><b id="kMob">0</b><span>Celulares</span></div>
+    </div>
+
+    <div id="list"></div>
+  </div>
+
+  <script>
+    const input = document.getElementById('fbUrl');
+    input.value = localStorage.getItem('wtv_fb_url') || '';
+
+    function saveUrl() {
+      localStorage.setItem('wtv_fb_url', input.value.trim().replace(/\/+$/, ''));
+      refresh();
+    }
+
+    async function refresh() {
+      const base = (localStorage.getItem('wtv_fb_url') || '').replace(/\/+$/, '');
+      if (!base) return;
+      try {
+        const res = await fetch(`${base}/sessions.json`);
+        const data = await res.json();
+        const now = Date.now();
+        const active = Object.values(data || {})
+          .filter(s => s && (now - (s.lastSeenAt || 0)) <= 90000)
+          .sort((a, b) => (b.lastSeenAt || 0) - (a.lastSeenAt || 0));
+
+        const tv = active.filter(s => s.deviceType === 'TV Box').length;
+        document.getElementById('kTotal').textContent = active.length;
+        document.getElementById('kTv').textContent = tv;
+        document.getElementById('kMob').textContent = active.length - tv;
+
+        const listEl = document.getElementById('list');
+        if (!active.length) {
+          listEl.innerHTML = '<div class="sub">Nenhum aparelho ativo no momento.</div>';
+          return;
+        }
+        listEl.innerHTML = active.map(s => {
+          const icon = s.deviceType === 'TV Box' ? '📺' : '📱';
+          const ago = Math.max(0, Math.floor((now - s.lastSeenAt) / 1000));
+          const watch = s.watchingTitle ? `▶ ${s.status}: ${s.watchingTitle}` : `🏠 ${s.status}`;
+          return `
+            <div class="card">
+              <div>
+                <div><b>${icon} ${s.deviceType} • Perfil: ${s.profileName || 'Principal'}</b></div>
+                <div class="watching">${watch}</div>
+                <div class="meta">${s.deviceName || ''} • ${s.appVersion || ''}</div>
+              </div>
+              <div class="badge">${ago <= 5 ? 'Agora' : `há ${ago}s`}</div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        document.getElementById('list').innerHTML = `<div class="sub">Erro ao conectar: ${e.message}</div>`;
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

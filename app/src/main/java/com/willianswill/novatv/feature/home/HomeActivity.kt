@@ -19,6 +19,7 @@ import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
 import com.willianswill.novatv.core.network.AppUpdateChecker
 import com.willianswill.novatv.core.network.AppUpdateInfo
 import com.willianswill.novatv.core.network.CatalogSyncWorker
+import com.willianswill.novatv.core.network.TelemetryManager
 import com.willianswill.novatv.core.player.AppPreferences
 import com.willianswill.novatv.core.player.MultiViewActivity
 import com.willianswill.novatv.core.player.PlayableItem
@@ -88,6 +89,7 @@ class HomeActivity : AppCompatActivity() {
         val user = UserProfileManager.getActiveUser(this)
         val avatar = UserProfileManager.getAvatar(user.avatarId)
         binding.btnSwitchProfile.text = "${avatar.emoji} ${user.name}"
+        TelemetryManager.sendHeartbeat(this, "Online no Menu")
         bannerHandler.removeCallbacks(autoRotateBanner)
         bannerHandler.postDelayed(autoRotateBanner, 6000L)
     }

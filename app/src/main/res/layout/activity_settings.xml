@@ -205,6 +205,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
             android:background="@drawable/selector_cinema_card"
             android:orientation="vertical"
             android:padding="16dp">
@@ -246,6 +247,76 @@
                     android:text="Restaurar Backup"
                     android:textColor="@color/accent_cyan" />
             </LinearLayout>
+        </LinearLayout>
+
+        <!-- Section: Control Panel & Telemetry (Firebase) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/selector_cinema_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📊 Painel de Controle &amp; Telemetria"
+                android:textColor="@color/accent_cyan"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="8dp"
+                android:text="URL do Firebase Realtime Database (para monitorar aparelhos online):"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/et_firebase_url"
+                    android:layout_width="0dp"
+                    android:layout_height="42dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/selector_cinema_card"
+                    android:focusable="true"
+                    android:hint="https://seu-app-default-rtdb.firebaseio.com"
+                    android:inputType="textUri"
+                    android:maxLines="1"
+                    android:paddingHorizontal="12dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_muted"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/btn_save_firebase"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="42dp"
+                    android:background="@drawable/selector_cinema_button"
+                    android:focusable="true"
+                    android:paddingHorizontal="14dp"
+                    android:text="Salvar"
+                    android:textColor="#FFFFFF" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btn_open_control_panel"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/selector_cinema_button"
+                android:focusable="true"
+                android:text="📊 Abrir Painel de Aparelhos Ativos"
+                android:textColor="@color/accent_emerald" />
         </LinearLayout>
 
     </LinearLayout>
