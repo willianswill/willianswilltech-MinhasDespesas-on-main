@@ -244,11 +244,12 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                val reason = extractErrorReason(error)
                 if (prefs.autoReconnect) {
-                    scheduleRetry()
+                    scheduleRetry(reason)
                 } else {
                     hideLoading()
-                    Toast.makeText(this@PlayerActivity, "Erro de reprodução: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@PlayerActivity, "Erro ($reason)", Toast.LENGTH_LONG).show()
                 }
             }
         })
@@ -288,16 +289,30 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun scheduleRetry() {
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun extractErrorReason(error: PlaybackException): String {
+        val cause = error.cause
+        return if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+            "HTTP ${cause.responseCode}"
+        } else {
+            error.errorCodeName
+        }
+    }
+
+    private fun scheduleRetry(reason: String = "") {
+        // Libera a conexão imediatamente para não prender o slot no servidor IPTV
+        releasePlayer()
         if (retryCount < MAX_RETRY) {
             retryCount++
             val delay = (retryCount * 1500L).coerceAtMost(6000L)
-            showLoading("Sinal instável. Reconectando ($retryCount/$MAX_RETRY)...")
+            val detail = if (reason.isNotBlank()) " [$reason]" else ""
+            showLoading("Sinal instável$detail. Reconectando ($retryCount/$MAX_RETRY)...")
             handler.removeCallbacks(retryRunnable)
             handler.postDelayed(retryRunnable, delay)
         } else {
             hideLoading()
-            Toast.makeText(this, "Não foi possível reconectar ao stream.", Toast.LENGTH_LONG).show()
+            val detail = if (reason.isNotBlank()) " ($reason)" else ""
+            Toast.makeText(this, "Não foi possível conectar ao canal$detail.", Toast.LENGTH_LONG).show()
             showControls()
         }
     }
