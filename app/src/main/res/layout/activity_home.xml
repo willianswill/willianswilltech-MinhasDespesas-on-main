@@ -20,10 +20,12 @@
             android:paddingBottom="18dp">
 
             <ImageView
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_poster_rounded"
+                android:clipToOutline="true"
                 android:contentDescription="@string/app_name"
-                android:src="@drawable/ic_tv_logo" />
+                android:src="@drawable/ic_wtv_launcher" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -35,9 +37,9 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="NovaTV"
+                    android:text="Wtv Canais Online"
                     android:textColor="@color/text_primary"
-                    android:textSize="22sp"
+                    android:textSize="20sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -91,7 +93,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Bem-vindo ao NovaTV IPTV"
+                android:text="Bem-vindo ao Wtv Canais Online"
                 android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 android:textStyle="bold" />

@@ -10,8 +10,8 @@
         </shape>
     </item>
     <item
-        android:width="72dp"
-        android:height="72dp"
-        android:drawable="@drawable/ic_tv_logo"
+        android:width="120dp"
+        android:height="120dp"
+        android:drawable="@drawable/ic_wtv_launcher"
         android:gravity="center" />
 </layer-list>

@@ -41,8 +41,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: NovaTV IPTV v1.0.${{ github.run_number }}
-          body: "Atualização automática NovaTV IPTV (Build #${{ github.run_number }})."
+          name: Wtv Canais Online v1.0.${{ github.run_number }}
+          body: "Atualização automática Wtv Canais Online (Build #${{ github.run_number }})."
           files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
