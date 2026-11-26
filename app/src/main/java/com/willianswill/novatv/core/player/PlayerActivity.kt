@@ -195,6 +195,8 @@ class PlayerActivity : AppCompatActivity() {
                 val delta = if (isRight) 10_000L else -10_000L
                 val target = (exo.currentPosition + delta).coerceIn(0L, exo.duration.coerceAtLeast(0L))
                 exo.seekTo(target)
+                updateSeekUiImmediate(target, exo.duration)
+                showControls(focusSeekBar = true)
                 showGestureFeedback(if (isRight) "+10s ⏩" else "⏪ -10s")
                 return true
             }
@@ -693,11 +695,21 @@ class PlayerActivity : AppCompatActivity() {
         showControls(focusSeekBar = false)
     }
 
+    private fun updateSeekUiImmediate(posMs: Long, durMs: Long) {
+        if (durMs > 0L) {
+            binding.seekBar.max = durMs.toInt()
+            binding.seekBar.progress = posMs.toInt()
+            binding.tvPosTime.text = formatDuration(posMs)
+            binding.tvDurTime.text = "-${formatDuration((durMs - posMs).coerceAtLeast(0L))}"
+        }
+    }
+
     private fun seekRelative(deltaMs: Long) {
         val exo = player ?: return
         if (!isVodPlayback() || exo.duration <= 0L) return
         val target = (exo.currentPosition + deltaMs).coerceIn(0L, exo.duration)
         exo.seekTo(target)
+        updateSeekUiImmediate(target, exo.duration)
         val sec = (deltaMs / 1000L)
         val sign = if (sec >= 0) "+${sec}s ⏩" else "⏪ ${sec}s"
         showGestureFeedback("$sign  (${formatDuration(target)})")
@@ -968,8 +980,8 @@ class PlayerActivity : AppCompatActivity() {
                     progressiveSeekDeltaMs += if (isRight) stepMs else -stepMs
                     val target = (exo.currentPosition + progressiveSeekDeltaMs).coerceIn(0L, exo.duration)
                     pendingSeekTargetMs = target
-                    binding.seekBar.progress = target.toInt()
-                    binding.tvPosTime.text = formatDuration(target)
+                    updateSeekUiImmediate(target, exo.duration)
+                    showControls(focusSeekBar = true)
                     val deltaSec = progressiveSeekDeltaMs / 1000L
                     val arrow = if (deltaSec >= 0) "⏩ +${deltaSec}s" else "⏪ ${deltaSec}s"
                     binding.tvGestureFeedback.text = "$arrow  •  ${formatDuration(target)}"
