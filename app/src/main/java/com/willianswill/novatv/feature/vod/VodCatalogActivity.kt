@@ -234,7 +234,7 @@ class VodCatalogActivity : AppCompatActivity() {
                 isFavorite = movie.isFavorite
             )
 
-            AlertDialog.Builder(this@VodCatalogActivity)
+            val dialog = AlertDialog.Builder(this@VodCatalogActivity)
                 .setTitle(movie.name)
                 .setMessage(info)
                 .setPositiveButton("▶ Assistir") { _, _ ->
@@ -246,7 +246,14 @@ class VodCatalogActivity : AppCompatActivity() {
                     }
                 }
                 .setNegativeButton("Fechar", null)
-                .show()
+                .create()
+            dialog.setOnShowListener {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.let { playBtn ->
+                    playBtn.requestFocus()
+                    playBtn.post { playBtn.requestFocus() }
+                }
+            }
+            dialog.show()
         }
     }
 
@@ -365,7 +372,7 @@ class VodCatalogActivity : AppCompatActivity() {
         val item = list[idx]
         if (item.resumePositionMs > 5_000L) {
             val timeStr = formatTime(item.resumePositionMs)
-            AlertDialog.Builder(this)
+            val dialog = AlertDialog.Builder(this)
                 .setTitle(item.title)
                 .setMessage("Você já assistiu até $timeStr. Como deseja continuar?")
                 .setPositiveButton("▶ Continuar ($timeStr)") { _, _ ->
@@ -377,7 +384,14 @@ class VodCatalogActivity : AppCompatActivity() {
                     openPlayer(resetList, idx)
                 }
                 .setNegativeButton("Cancelar", null)
-                .show()
+                .create()
+            dialog.setOnShowListener {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.let { continueBtn ->
+                    continueBtn.requestFocus()
+                    continueBtn.post { continueBtn.requestFocus() }
+                }
+            }
+            dialog.show()
         } else {
             openPlayer(list, idx)
         }

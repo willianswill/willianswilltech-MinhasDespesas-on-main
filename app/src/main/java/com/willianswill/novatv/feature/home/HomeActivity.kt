@@ -134,7 +134,7 @@ class HomeActivity : AppCompatActivity() {
             val item = list[idx]
             if (item.mediaType != MediaType.LIVE && item.resumePositionMs > 5_000L) {
                 val timeStr = formatTime(item.resumePositionMs)
-                AlertDialog.Builder(this)
+                val dialog = AlertDialog.Builder(this)
                     .setTitle(item.title)
                     .setMessage("Você já assistiu até $timeStr. Como deseja reproduzir?")
                     .setPositiveButton("▶ Continuar ($timeStr)") { _, _ ->
@@ -146,7 +146,14 @@ class HomeActivity : AppCompatActivity() {
                         launchPlayer(resetList, idx)
                     }
                     .setNegativeButton("Cancelar", null)
-                    .show()
+                    .create()
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.let { continueBtn ->
+                        continueBtn.requestFocus()
+                        continueBtn.post { continueBtn.requestFocus() }
+                    }
+                }
+                dialog.show()
             } else {
                 launchPlayer(list, idx)
             }
