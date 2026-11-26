@@ -63,6 +63,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private var items: List<PlayableItem> = emptyList()
     private var currentIndex = 0
+    private var previousIndex = -1
     private var retryCount = 0
     private var resizeIdx = 0
     private var isSeeking = false
@@ -139,14 +140,7 @@ class PlayerActivity : AppCompatActivity() {
         overlayAdapter = PlayerChannelOverlayAdapter(items, currentIndex) { selectedIdx ->
             closeChannelDrawer()
             if (selectedIdx != currentIndex) {
-                saveCurrentWatchProgress()
-                currentIndex = selectedIdx
-                retryCount = 0
-                overrideCatchupUrl = null
-                externalSubUri = null
-                currentVariant = null
-                activeVariants = emptyList()
-                startPlayback(isRetry = false)
+                switchToIndex(selectedIdx)
             }
         }
         binding.rvPlayerChannels.adapter = overlayAdapter
@@ -251,6 +245,16 @@ class PlayerActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnChannelList.setOnClickListener { openChannelDrawer() }
         binding.btnCloseDrawer.setOnClickListener { closeChannelDrawer() }
+        binding.btnRecall.setOnClickListener {
+            if (previousIndex in items.indices && previousIndex != currentIndex) {
+                switchToIndex(previousIndex)
+            }
+        }
+        binding.btnNextEpisode.setOnClickListener {
+            if (currentIndex + 1 < items.size) {
+                switchToIndex(currentIndex + 1)
+            }
+        }
 
         binding.btnPlayPause.setOnClickListener {
             val p = player ?: return@setOnClickListener
@@ -328,16 +332,24 @@ class PlayerActivity : AppCompatActivity() {
         })
     }
 
-    private fun zap(delta: Int) {
-        if (items.size <= 1) return
+    private fun switchToIndex(newIndex: Int) {
         saveCurrentWatchProgress()
-        currentIndex = (currentIndex + delta + items.size) % items.size
+        previousIndex = currentIndex
+        currentIndex = newIndex
         retryCount = 0
         overrideCatchupUrl = null
         externalSubUri = null
         currentVariant = null
         activeVariants = emptyList()
+        binding.btnNextEpisode.visibility = View.GONE
+        binding.btnRecall.visibility = if (previousIndex in items.indices) View.VISIBLE else View.GONE
         startPlayback(isRetry = false)
+    }
+
+    private fun zap(delta: Int) {
+        if (items.size <= 1) return
+        val next = (currentIndex + delta + items.size) % items.size
+        switchToIndex(next)
         showControls()
     }
 
@@ -400,7 +412,10 @@ class PlayerActivity : AppCompatActivity() {
                     }
                     Player.STATE_ENDED -> {
                         hideLoading()
-                        if (item.mediaType == MediaType.LIVE && overrideCatchupUrl == null && prefs.autoReconnect) {
+                        if (item.mediaType == MediaType.SERIES && currentIndex + 1 < items.size) {
+                            binding.btnNextEpisode.visibility = View.VISIBLE
+                            binding.btnNextEpisode.requestFocus()
+                        } else if (item.mediaType == MediaType.LIVE && overrideCatchupUrl == null && prefs.autoReconnect) {
                             scheduleRetry()
                         }
                     }
@@ -689,6 +704,13 @@ class PlayerActivity : AppCompatActivity() {
         if (!isSeeking && exo.duration > 0) {
             binding.seekBar.progress = exo.currentPosition.toInt()
             binding.tvPosTime.text = formatDuration(exo.currentPosition)
+            val item = items.getOrNull(currentIndex)
+            if (item?.mediaType == MediaType.SERIES && currentIndex + 1 < items.size) {
+                val remaining = exo.duration - exo.currentPosition
+                if (remaining in 1L..45_000L) {
+                    binding.btnNextEpisode.visibility = View.VISIBLE
+                }
+            }
         }
     }
 

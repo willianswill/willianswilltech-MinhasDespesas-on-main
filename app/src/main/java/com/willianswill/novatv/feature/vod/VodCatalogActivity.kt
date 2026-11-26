@@ -98,7 +98,20 @@ class VodCatalogActivity : AppCompatActivity() {
         binding.rvCategories.adapter = categoryAdapter
 
         vodAdapter = VodPagingAdapter { movie -> showMovieDetails(movie) }
-        seriesAdapter = SeriesPagingAdapter { series -> showSeriesEpisodes(series) }
+        seriesAdapter = SeriesPagingAdapter { series ->
+            startActivity(
+                Intent(this, SeriesDetailActivity::class.java).apply {
+                    putExtra(SeriesDetailActivity.EXTRA_SERIES_DB_ID, series.id)
+                    putExtra(SeriesDetailActivity.EXTRA_SERIES_ID, series.seriesId)
+                    putExtra(SeriesDetailActivity.EXTRA_NAME, series.name)
+                    putExtra(SeriesDetailActivity.EXTRA_COVER, series.coverUrl)
+                    putExtra(SeriesDetailActivity.EXTRA_CATEGORY, series.categoryName)
+                    putExtra(SeriesDetailActivity.EXTRA_PLOT, series.plot)
+                    putExtra(SeriesDetailActivity.EXTRA_RATING, series.rating)
+                    putExtra(SeriesDetailActivity.EXTRA_IS_FAV, series.isFavorite)
+                }
+            )
+        }
 
         val span = if (isLandscape) 5 else 2
         binding.rvVodGrid.layoutManager = GridLayoutManager(this, span)
