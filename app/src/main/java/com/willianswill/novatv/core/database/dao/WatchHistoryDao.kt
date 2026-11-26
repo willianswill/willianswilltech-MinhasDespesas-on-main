@@ -22,6 +22,19 @@ interface WatchHistoryDao {
     )
     fun observeContinueWatching(profileId: Long, limit: Int = 25): Flow<List<WatchHistoryEntity>>
 
+    @Query(
+        """
+        SELECT * FROM watch_history
+        WHERE profileId = :profileId AND mediaType = :mediaType
+        ORDER BY updatedAt DESC
+        LIMIT :limit
+        """
+    )
+    fun observeByMediaType(profileId: Long, mediaType: String, limit: Int = 25): Flow<List<WatchHistoryEntity>>
+
+    @Query("SELECT * FROM watch_history WHERE profileId = :profileId AND seriesId = :seriesId")
+    suspend fun getBySeriesId(profileId: Long, seriesId: String): List<WatchHistoryEntity>
+
     @Query("SELECT * FROM watch_history WHERE profileId = :profileId AND contentKey = :contentKey LIMIT 1")
     suspend fun getProgress(profileId: Long, contentKey: String): WatchHistoryEntity?
 

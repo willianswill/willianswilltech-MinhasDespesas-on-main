@@ -26,5 +26,8 @@ data class PlayableItem(
     val resumePositionMs: Long = 0L,
     val streamDbId: Long = 0L,
     val isFavorite: Boolean = false,
-    val variants: List<QualityVariant> = emptyList()
+    val variants: List<QualityVariant> = emptyList(),
+    val seriesId: String = "",
+    val seasonNum: Int = 0,
+    val episodeNum: Int = 0
 ) : Serializable

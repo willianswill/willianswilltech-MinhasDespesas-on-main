@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.ProfileEntity
@@ -27,6 +28,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 class VodCatalogActivity : AppCompatActivity() {
 
@@ -152,44 +154,47 @@ class VodCatalogActivity : AppCompatActivity() {
     }
 
     private fun showMovieDetails(movie: StreamEntity) {
-        val favLabel = if (movie.isFavorite) "Remover dos Favoritos" else "★ Favoritar"
-        val info = buildString {
-            append("Categoria: ${movie.categoryName}\n")
-            if (movie.rating.isNotBlank()) append("Nota: ★ ${movie.rating}\n")
-            if (movie.plot.isNotBlank()) append("\n${movie.plot}")
-        }
+        val profile = activeProfile ?: return
+        lifecycleScope.launch {
+            val saved = repository.getWatchProgress(profile.id, movie.streamUrl)
+            val resumeMs = saved?.positionMs ?: 0L
+            val favLabel = if (movie.isFavorite) "Remover Favorito" else "★ Favoritar"
+            val info = buildString {
+                append("Categoria: ${movie.categoryName}\n")
+                if (movie.rating.isNotBlank()) append("Nota: ★ ${movie.rating}\n")
+                if (resumeMs > 5_000L) append("Progresso salvo: ${formatTime(resumeMs)}\n")
+                if (movie.plot.isNotBlank()) append("\n${movie.plot}")
+            }
 
-        AlertDialog.Builder(this)
-            .setTitle(movie.name)
-            .setMessage(info)
-            .setPositiveButton("▶ Assistir") { _, _ ->
-                val item = PlayableItem(
-                    contentKey = movie.streamUrl,
-                    title = movie.name,
-                    subtitle = movie.categoryName,
-                    streamUrl = movie.streamUrl,
-                    iconUrl = movie.iconUrl,
-                    mediaType = MediaType.MOVIE,
-                    streamId = movie.streamId,
-                    userAgent = movie.userAgent,
-                    referrer = movie.referrer,
-                    streamDbId = movie.id,
-                    isFavorite = movie.isFavorite
-                )
-                startActivity(
-                    Intent(this, PlayerActivity::class.java).apply {
-                        putExtra(PlayerActivity.EXTRA_ITEMS, arrayListOf(item))
-                        putExtra(PlayerActivity.EXTRA_INDEX, 0)
-                    }
-                )
-            }
-            .setNeutralButton(favLabel) { _, _ ->
-                lifecycleScope.launch {
-                    repository.toggleStreamFavorite(movie.id, !movie.isFavorite)
+            val baseItem = PlayableItem(
+                contentKey = movie.streamUrl,
+                title = movie.name,
+                subtitle = movie.categoryName,
+                streamUrl = movie.streamUrl,
+                iconUrl = movie.iconUrl,
+                mediaType = MediaType.MOVIE,
+                streamId = movie.streamId,
+                userAgent = movie.userAgent,
+                referrer = movie.referrer,
+                resumePositionMs = resumeMs,
+                streamDbId = movie.id,
+                isFavorite = movie.isFavorite
+            )
+
+            AlertDialog.Builder(this@VodCatalogActivity)
+                .setTitle(movie.name)
+                .setMessage(info)
+                .setPositiveButton("▶ Assistir") { _, _ ->
+                    launchWithResumeChoice(listOf(baseItem), 0)
                 }
-            }
-            .setNegativeButton("Fechar", null)
-            .show()
+                .setNeutralButton(favLabel) { _, _ ->
+                    lifecycleScope.launch {
+                        repository.toggleStreamFavorite(movie.id, !movie.isFavorite)
+                    }
+                }
+                .setNegativeButton("Fechar", null)
+                .show()
+        }
     }
 
     private fun showSeriesEpisodes(series: SeriesEntity) {
@@ -211,39 +216,57 @@ class VodCatalogActivity : AppCompatActivity() {
                     .sortedBy { it.key.toIntOrNull() ?: 999 }
                     .flatMap { (_, epList) -> epList.sortedBy { it.episodeNum } }
 
-                val playables = episodes.map { ep ->
+                val historyMap = repository.getSeriesHistory(profile.id, series.seriesId)
+                    .associateBy { it.contentKey }
+
+                val entries = episodes.map { ep ->
                     val ext = ep.containerExtension.orEmpty().ifBlank { "mp4" }
                     val epUrl = client.buildSeriesEpisodeUrl(profile.serverUrl, profile.username, profile.password, ep.id, ext)
-                    PlayableItem(
-                        contentKey = epUrl,
-                        title = "${series.name} • T${ep.season}E${ep.episodeNum}",
-                        subtitle = ep.title,
-                        streamUrl = epUrl,
-                        iconUrl = ep.info?.movieImage ?: series.coverUrl,
-                        mediaType = MediaType.SERIES,
-                        streamId = ep.id,
-                        userAgent = profile.userAgent.takeIf { it.isNotBlank() }
+                    val saved = historyMap[epUrl]
+                    val pct = if (saved != null && saved.durationMs > 0L) {
+                        ((saved.positionMs * 100) / saved.durationMs).toInt().coerceIn(1, 100)
+                    } else 0
+
+                    EpisodeUiEntry(
+                        playable = PlayableItem(
+                            contentKey = epUrl,
+                            title = "${series.name} • T${ep.season}E${ep.episodeNum}",
+                            subtitle = ep.title,
+                            streamUrl = epUrl,
+                            iconUrl = ep.info?.movieImage ?: series.coverUrl,
+                            mediaType = MediaType.SERIES,
+                            streamId = ep.id,
+                            userAgent = profile.userAgent.takeIf { it.isNotBlank() },
+                            resumePositionMs = saved?.positionMs ?: 0L,
+                            seriesId = series.seriesId,
+                            seasonNum = ep.season,
+                            episodeNum = ep.episodeNum
+                        ),
+                        progressPercent = pct
                     )
                 }
 
                 withContext(Dispatchers.Main) {
-                    if (playables.isEmpty()) {
+                    if (entries.isEmpty()) {
                         Toast.makeText(this@VodCatalogActivity, "Nenhum episódio encontrado.", Toast.LENGTH_SHORT).show()
                         return@withContext
                     }
-                    val labels = playables.map { "${it.title} - ${it.subtitle}" }.toTypedArray()
-                    AlertDialog.Builder(this@VodCatalogActivity)
+
+                    val recycler = RecyclerView(this@VodCatalogActivity).apply {
+                        layoutManager = LinearLayoutManager(this@VodCatalogActivity)
+                        setPadding(24, 16, 24, 16)
+                    }
+                    val dialog = AlertDialog.Builder(this@VodCatalogActivity)
                         .setTitle(series.name)
-                        .setItems(labels) { _, idx ->
-                            startActivity(
-                                Intent(this@VodCatalogActivity, PlayerActivity::class.java).apply {
-                                    putExtra(PlayerActivity.EXTRA_ITEMS, ArrayList(playables))
-                                    putExtra(PlayerActivity.EXTRA_INDEX, idx)
-                                }
-                            )
-                        }
+                        .setView(recycler)
                         .setNegativeButton("Fechar", null)
-                        .show()
+                        .create()
+
+                    recycler.adapter = EpisodeProgressAdapter(entries) { idx ->
+                        dialog.dismiss()
+                        launchWithResumeChoice(entries.map { it.playable }, idx)
+                    }
+                    dialog.show()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -251,5 +274,45 @@ class VodCatalogActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun launchWithResumeChoice(list: List<PlayableItem>, idx: Int) {
+        val item = list[idx]
+        if (item.resumePositionMs > 5_000L) {
+            val timeStr = formatTime(item.resumePositionMs)
+            AlertDialog.Builder(this)
+                .setTitle(item.title)
+                .setMessage("Você já assistiu até $timeStr. Como deseja continuar?")
+                .setPositiveButton("▶ Continuar ($timeStr)") { _, _ ->
+                    openPlayer(list, idx)
+                }
+                .setNeutralButton("↺ Do início") { _, _ ->
+                    val resetList = list.toMutableList()
+                    resetList[idx] = item.copy(resumePositionMs = 0L)
+                    openPlayer(resetList, idx)
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        } else {
+            openPlayer(list, idx)
+        }
+    }
+
+    private fun openPlayer(list: List<PlayableItem>, idx: Int) {
+        startActivity(
+            Intent(this, PlayerActivity::class.java).apply {
+                putExtra(PlayerActivity.EXTRA_ITEMS, ArrayList(list))
+                putExtra(PlayerActivity.EXTRA_INDEX, idx)
+            }
+        )
+    }
+
+    private fun formatTime(ms: Long): String {
+        val sec = (ms / 1000L).coerceAtLeast(0L)
+        val h = sec / 3600L
+        val m = (sec % 3600L) / 60L
+        val s = sec % 60L
+        return if (h > 0) String.format(Locale.getDefault(), "%d:%02d:%02d", h, m, s)
+        else String.format(Locale.getDefault(), "%02d:%02d", m, s)
     }
 }

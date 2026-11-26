@@ -4,11 +4,13 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
+import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
 import com.willianswill.novatv.core.network.CatalogSyncWorker
 import com.willianswill.novatv.core.player.AppPreferences
 import com.willianswill.novatv.core.player.MultiViewActivity
@@ -22,6 +24,7 @@ import com.willianswill.novatv.feature.vod.VodCatalogActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class HomeActivity : AppCompatActivity() {
 
@@ -29,9 +32,11 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var repository: IptvRepository
     private lateinit var prefs: AppPreferences
 
-    private lateinit var continueAdapter: HomeCarouselAdapter
+    private lateinit var recentChannelsAdapter: HomeCarouselAdapter
+    private lateinit var recentSeriesAdapter: HomeCarouselAdapter
+    private lateinit var recentMoviesAdapter: HomeCarouselAdapter
     private lateinit var favAdapter: HomeCarouselAdapter
-    private lateinit var recentAdapter: HomeCarouselAdapter
+    private lateinit var recentAddedAdapter: HomeCarouselAdapter
 
     private var favPlayables: List<PlayableItem> = emptyList()
     private var profileDataJob: Job? = null
@@ -51,27 +56,61 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun setupCarousels() {
-        val openPlayer: (List<PlayableItem>, Int) -> Unit = { list, idx ->
-            startActivity(
-                Intent(this, PlayerActivity::class.java).apply {
-                    putExtra(PlayerActivity.EXTRA_ITEMS, ArrayList(list))
-                    putExtra(PlayerActivity.EXTRA_INDEX, idx)
-                }
-            )
+        val openDirect: (List<PlayableItem>, Int) -> Unit = { list, idx ->
+            launchPlayer(list, idx)
         }
 
-        continueAdapter = HomeCarouselAdapter(openPlayer)
-        favAdapter = HomeCarouselAdapter(openPlayer)
-        recentAdapter = HomeCarouselAdapter(openPlayer)
+        val openWithResumePrompt: (List<PlayableItem>, Int) -> Unit = { list, idx ->
+            val item = list[idx]
+            if (item.mediaType != MediaType.LIVE && item.resumePositionMs > 5_000L) {
+                val timeStr = formatTime(item.resumePositionMs)
+                AlertDialog.Builder(this)
+                    .setTitle(item.title)
+                    .setMessage("Você já assistiu até $timeStr. Como deseja reproduzir?")
+                    .setPositiveButton("▶ Continuar ($timeStr)") { _, _ ->
+                        launchPlayer(list, idx)
+                    }
+                    .setNeutralButton("↺ Do início") { _, _ ->
+                        val resetList = list.toMutableList()
+                        resetList[idx] = item.copy(resumePositionMs = 0L)
+                        launchPlayer(resetList, idx)
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
+            } else {
+                launchPlayer(list, idx)
+            }
+        }
 
-        binding.rvContinue.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        binding.rvContinue.adapter = continueAdapter
+        recentChannelsAdapter = HomeCarouselAdapter(openDirect)
+        recentSeriesAdapter = HomeCarouselAdapter(openWithResumePrompt)
+        recentMoviesAdapter = HomeCarouselAdapter(openWithResumePrompt)
+        favAdapter = HomeCarouselAdapter(openDirect)
+        recentAddedAdapter = HomeCarouselAdapter(openDirect)
+
+        binding.rvRecentChannels.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.rvRecentChannels.adapter = recentChannelsAdapter
+
+        binding.rvRecentSeries.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.rvRecentSeries.adapter = recentSeriesAdapter
+
+        binding.rvRecentMovies.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.rvRecentMovies.adapter = recentMoviesAdapter
 
         binding.rvFavorites.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.rvFavorites.adapter = favAdapter
 
         binding.rvRecent.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        binding.rvRecent.adapter = recentAdapter
+        binding.rvRecent.adapter = recentAddedAdapter
+    }
+
+    private fun launchPlayer(list: List<PlayableItem>, idx: Int) {
+        startActivity(
+            Intent(this, PlayerActivity::class.java).apply {
+                putExtra(PlayerActivity.EXTRA_ITEMS, ArrayList(list))
+                putExtra(PlayerActivity.EXTRA_INDEX, idx)
+            }
+        )
     }
 
     private fun setupNavigation() {
@@ -124,7 +163,9 @@ class HomeActivity : AppCompatActivity() {
                 if (profile == null) {
                     binding.tvActiveProfile.text = "Nenhum servidor conectado"
                     binding.bannerNoProfile.visibility = View.VISIBLE
-                    toggleSection(binding.tvSectionContinue, binding.rvContinue, false)
+                    toggleSection(binding.tvSectionRecentChannels, binding.rvRecentChannels, false)
+                    toggleSection(binding.tvSectionRecentSeries, binding.rvRecentSeries, false)
+                    toggleSection(binding.tvSectionRecentMovies, binding.rvRecentMovies, false)
                     toggleSection(binding.tvSectionFavorites, binding.rvFavorites, false)
                     toggleSection(binding.tvSectionRecent, binding.rvRecent, false)
                     return@collectLatest
@@ -137,24 +178,26 @@ class HomeActivity : AppCompatActivity() {
                 val includeAdult = prefs.showAdultContent
                 profileDataJob = lifecycleScope.launch {
                     launch {
-                        repository.observeContinueWatching(profile.id).collectLatest { list ->
-                            val mapped = list.map { h ->
-                                val pct = if (h.durationMs > 0) ((h.positionMs * 100) / h.durationMs).toInt().coerceIn(1, 99) else 0
-                                HomeCarouselItem(
-                                    playable = PlayableItem(
-                                        contentKey = h.contentKey,
-                                        title = h.title,
-                                        subtitle = h.mediaType,
-                                        streamUrl = h.streamUrl,
-                                        iconUrl = h.iconUrl,
-                                        mediaType = h.mediaType,
-                                        resumePositionMs = h.positionMs
-                                    ),
-                                    progressPercent = pct
-                                )
-                            }
-                            continueAdapter.submitList(mapped)
-                            toggleSection(binding.tvSectionContinue, binding.rvContinue, mapped.isNotEmpty())
+                        repository.observeHistoryByType(profile.id, MediaType.LIVE).collectLatest { list ->
+                            val mapped = list.map { it.toCarouselItem() }
+                            recentChannelsAdapter.submitList(mapped)
+                            toggleSection(binding.tvSectionRecentChannels, binding.rvRecentChannels, mapped.isNotEmpty())
+                        }
+                    }
+
+                    launch {
+                        repository.observeHistoryByType(profile.id, MediaType.SERIES).collectLatest { list ->
+                            val mapped = list.map { it.toCarouselItem() }
+                            recentSeriesAdapter.submitList(mapped)
+                            toggleSection(binding.tvSectionRecentSeries, binding.rvRecentSeries, mapped.isNotEmpty())
+                        }
+                    }
+
+                    launch {
+                        repository.observeHistoryByType(profile.id, MediaType.MOVIE).collectLatest { list ->
+                            val mapped = list.map { it.toCarouselItem() }
+                            recentMoviesAdapter.submitList(mapped)
+                            toggleSection(binding.tvSectionRecentMovies, binding.rvRecentMovies, mapped.isNotEmpty())
                         }
                     }
 
@@ -163,7 +206,7 @@ class HomeActivity : AppCompatActivity() {
                             val mapped = list.map { s ->
                                 val p = PlayableItem(
                                     contentKey = s.streamUrl,
-                                    title = s.name,
+                                    title = s.baseName,
                                     subtitle = s.categoryName,
                                     streamUrl = s.streamUrl,
                                     iconUrl = s.iconUrl,
@@ -204,13 +247,41 @@ class HomeActivity : AppCompatActivity() {
                                     )
                                 )
                             }
-                            recentAdapter.submitList(mapped)
+                            recentAddedAdapter.submitList(mapped)
                             toggleSection(binding.tvSectionRecent, binding.rvRecent, mapped.isNotEmpty())
                         }
                     }
                 }
             }
         }
+    }
+
+    private fun WatchHistoryEntity.toCarouselItem(): HomeCarouselItem {
+        val pct = if (durationMs > 0) ((positionMs * 100) / durationMs).toInt().coerceIn(1, 100) else 0
+        return HomeCarouselItem(
+            playable = PlayableItem(
+                contentKey = contentKey,
+                title = title,
+                subtitle = if (mediaType == MediaType.LIVE) "Ao Vivo" else if (pct > 0) "$pct% assistido" else mediaType,
+                streamUrl = streamUrl,
+                iconUrl = iconUrl,
+                mediaType = mediaType,
+                resumePositionMs = positionMs,
+                seriesId = seriesId,
+                seasonNum = seasonNum,
+                episodeNum = episodeNum
+            ),
+            progressPercent = pct
+        )
+    }
+
+    private fun formatTime(ms: Long): String {
+        val sec = (ms / 1000L).coerceAtLeast(0L)
+        val h = sec / 3600L
+        val m = (sec % 3600L) / 60L
+        val s = sec % 60L
+        return if (h > 0) String.format(Locale.getDefault(), "%d:%02d:%02d", h, m, s)
+        else String.format(Locale.getDefault(), "%02d:%02d", m, s)
     }
 
     private fun toggleSection(header: View, list: View, visible: Boolean) {

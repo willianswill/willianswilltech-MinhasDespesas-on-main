@@ -237,20 +237,60 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Section: Continue Watching -->
+        <!-- Section: Recent Live Channels -->
         <TextView
-            android:id="@+id/tv_section_continue"
+            android:id="@+id/tv_section_recent_channels"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="10dp"
-            android:text="▶ Continuar Assistindo"
+            android:text="📺 Últimos Canais Assistidos"
             android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:textStyle="bold"
             android:visibility="gone" />
 
         <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_continue"
+            android:id="@+id/rv_recent_channels"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+        <!-- Section: Recent Series -->
+        <TextView
+            android:id="@+id/tv_section_recent_series"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="🎞️ Últimas Séries Assistidas"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_recent_series"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+        <!-- Section: Recent Movies -->
+        <TextView
+            android:id="@+id/tv_section_recent_movies"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="🎬 Últimos Filmes Assistidos"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_recent_movies"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp"

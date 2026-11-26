@@ -123,6 +123,19 @@ class IptvRepository(context: Context) {
     fun observeContinueWatching(profileId: Long) =
         historyDao.observeContinueWatching(profileId)
 
+    fun observeHistoryByType(profileId: Long, mediaType: String) =
+        historyDao.observeByMediaType(profileId, mediaType)
+
+    suspend fun getWatchProgress(profileId: Long, contentKey: String) =
+        withContext(Dispatchers.IO) {
+            historyDao.getProgress(profileId, contentKey)
+        }
+
+    suspend fun getSeriesHistory(profileId: Long, seriesId: String) =
+        withContext(Dispatchers.IO) {
+            historyDao.getBySeriesId(profileId, seriesId)
+        }
+
     suspend fun toggleStreamFavorite(id: Long, isFavorite: Boolean) = withContext(Dispatchers.IO) {
         streamDao.updateFavorite(id, isFavorite)
     }

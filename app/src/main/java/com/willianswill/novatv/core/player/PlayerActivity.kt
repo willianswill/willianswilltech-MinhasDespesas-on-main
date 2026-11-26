@@ -35,6 +35,8 @@ import com.willianswill.novatv.core.database.entity.ProfileType
 import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
 import com.willianswill.novatv.core.network.XtreamApiClient
 import com.willianswill.novatv.databinding.ActivityPlayerBinding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -576,9 +578,9 @@ class PlayerActivity : AppCompatActivity() {
         val item = items.getOrNull(currentIndex) ?: return
         val pos = exo.currentPosition
         val dur = exo.duration.coerceAtLeast(0L)
-        if (pos < 5_000L && item.mediaType != MediaType.LIVE) return
+        if (item.mediaType != MediaType.LIVE && pos < 5_000L) return
 
-        lifecycleScope.launch {
+        CoroutineScope(Dispatchers.IO).launch {
             val profile = repository.observeActiveProfile().firstOrNull() ?: return@launch
             repository.upsertWatchProgress(
                 WatchHistoryEntity(
@@ -589,7 +591,10 @@ class PlayerActivity : AppCompatActivity() {
                     iconUrl = item.iconUrl,
                     streamUrl = item.streamUrl,
                     positionMs = if (item.mediaType == MediaType.LIVE) 0L else pos,
-                    durationMs = dur
+                    durationMs = dur,
+                    seriesId = item.seriesId,
+                    seasonNum = item.seasonNum,
+                    episodeNum = item.episodeNum
                 )
             )
         }
