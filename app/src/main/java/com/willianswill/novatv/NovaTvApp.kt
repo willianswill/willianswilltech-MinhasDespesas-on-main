@@ -22,8 +22,9 @@ class NovaTvApp : MultiDexApplication() {
     private var isDialogShowing = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private val commandPollRunnable = object : Runnable {
+    private val commandPollRunnable: Runnable = object : Runnable {
         override fun run() {
+            val self = this
             val act = currentActivityRef?.get()
             if (act != null && !act.isFinishing && !act.isDestroyed && !isDialogShowing) {
                 CoroutineScope(Dispatchers.Main).launch {
@@ -34,7 +35,7 @@ class NovaTvApp : MultiDexApplication() {
                             if (cmd.action == "BLOCK") isDialogShowing = true
                             TelemetryManager.handleCommandOnActivity(activeNow, cmd) {
                                 isDialogShowing = false
-                                mainHandler.post(this@NovaTvApp.commandPollRunnable)
+                                mainHandler.post(self)
                             }
                         }
                     }
