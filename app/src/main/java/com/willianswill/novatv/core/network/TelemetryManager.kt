@@ -35,9 +35,8 @@ object TelemetryManager {
     private const val KEY_FIREBASE_URL = "firebase_rtdb_url"
     private const val ACTIVE_WINDOW_MS = 90_000L
 
-    // Se quiser deixar uma URL fixa em todos os aparelhos sem precisar colar manualmente,
-    // basta colocar a URL do seu Firebase Realtime Database aqui:
-    private const val DEFAULT_FIREBASE_URL = ""
+    // URL fixa do Firebase Realtime Database para envio silencioso de status dos aparelhos
+    private const val DEFAULT_FIREBASE_URL = "https://wtvcanaisonline-295f0-default-rtdb.asia-southeast1.firebasedatabase.app"
 
     fun getFirebaseUrl(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
