@@ -3,6 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_cinema"
+    android:fitsSystemWindows="true"
     android:padding="20dp">
 
     <LinearLayout
@@ -51,39 +52,45 @@
                 android:id="@+id/tab_xtream"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
+                android:layout_height="wrap_content"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/selector_cinema_button"
                 android:focusable="true"
-                android:text="Xtream Codes"
+                android:maxLines="1"
+                android:minHeight="44dp"
+                android:text="Xtream"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/tab_m3u"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
+                android:layout_height="wrap_content"
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/selector_cinema_button"
                 android:focusable="true"
-                android:text="Lista M3U / Local"
+                android:maxLines="1"
+                android:minHeight="44dp"
+                android:text="M3U / Local"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <Button
                 android:id="@+id/tab_stalker"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
-                android:layout_height="44dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:background="@drawable/selector_cinema_button"
                 android:focusable="true"
-                android:text="Stalker MAC"
+                android:maxLines="1"
+                android:minHeight="44dp"
+                android:text="Stalker"
                 android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
         </LinearLayout>
 
         <!-- Form Card -->
