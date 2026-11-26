@@ -151,7 +151,7 @@ class LiveTvActivity : AppCompatActivity() {
                 activeProfileId = profile.id
                 launch {
                     repository.observeCategories(profile.id, MediaType.LIVE, prefs.showAdultContent).collectLatest { cats ->
-                        categoryAdapter.submitCategories(cats)
+                        categoryAdapter.submitCategories(CategoryPrioritySorter.sortLiveCategories(cats))
                     }
                 }
                 loadPagedChannels()

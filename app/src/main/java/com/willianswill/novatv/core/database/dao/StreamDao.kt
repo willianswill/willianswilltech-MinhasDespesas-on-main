@@ -23,7 +23,21 @@ interface StreamDao {
           AND (:includeAdult = 1 OR isAdult = 0)
           AND (:query = '' OR baseName LIKE '%' || :query || '%' OR name LIKE '%' || :query || '%')
         GROUP BY categoryId, baseName
-        ORDER BY MIN(id) ASC
+        ORDER BY
+          CASE
+            WHEN baseName LIKE '%São Paulo%'
+              OR baseName LIKE '%SÃO PAULO%'
+              OR UPPER(baseName) LIKE '%SAO PAULO%'
+              OR UPPER(baseName) LIKE '% SP'
+              OR UPPER(baseName) LIKE '% SP %'
+              OR UPPER(baseName) LIKE '%-SP%'
+              OR UPPER(baseName) LIKE '%(SP)%'
+              OR UPPER(baseName) LIKE '%[SP]%'
+              OR UPPER(baseName) LIKE '%PAULISTA%'
+            THEN 0
+            ELSE 1
+          END ASC,
+          MIN(id) ASC
         """
     )
     fun pagingSource(
