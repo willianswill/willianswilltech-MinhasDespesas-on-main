@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import okhttp3.ConnectionPool
 import okhttp3.Dns
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.security.SecureRandom
@@ -23,16 +25,59 @@ object HttpClientProvider {
         override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
     }
 
-    // Prioriza IPv4 para evitar quedas em redes 5G móveis com servidores IPTV sem suporte IPv6
-    private val ipv4PreferredDns = object : Dns {
+    private val dohClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .build()
+    }
+
+    // Prioriza IPv4 e usa Google DoH como fallback se o DNS da operadora bloquear/falhar
+    private val resilientDns = object : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
-            return Dns.SYSTEM.lookup(hostname).sortedBy { it !is Inet4Address }
+            val systemResult = runCatching {
+                Dns.SYSTEM.lookup(hostname)
+                    .filter { !it.isLoopbackAddress && !it.isAnyLocalAddress }
+                    .sortedBy { it !is Inet4Address }
+            }.getOrNull()
+
+            if (!systemResult.isNullOrEmpty()) {
+                return systemResult
+            }
+
+            val dohIps = resolveViaGoogleDoh(hostname)
+            if (dohIps.isNotEmpty()) return dohIps
+
+            return Dns.SYSTEM.lookup(hostname)
+        }
+
+        private fun resolveViaGoogleDoh(hostname: String): List<InetAddress> {
+            return runCatching {
+                val req = Request.Builder()
+                    .url("https://dns.google/resolve?name=$hostname&type=A")
+                    .header("Accept", "application/dns-json")
+                    .build()
+                dohClient.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return emptyList()
+                    val body = resp.body?.string().orEmpty()
+                    val answers = JSONObject(body).optJSONArray("Answer") ?: return emptyList()
+                    val ips = mutableListOf<InetAddress>()
+                    for (i in 0 until answers.length()) {
+                        val item = answers.getJSONObject(i)
+                        if (item.optInt("type") == 1) {
+                            val ip = item.optString("data")
+                            if (ip.isNotBlank()) ips.add(InetAddress.getByName(ip))
+                        }
+                    }
+                    ips
+                }
+            }.getOrDefault(emptyList())
         }
     }
 
     val sharedClient: OkHttpClient by lazy {
         val builder = OkHttpClient.Builder()
-            .dns(ipv4PreferredDns)
+            .dns(resilientDns)
             .connectionPool(ConnectionPool(8, 60, TimeUnit.SECONDS))
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(45, TimeUnit.SECONDS)

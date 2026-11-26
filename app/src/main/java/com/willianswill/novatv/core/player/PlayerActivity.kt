@@ -292,11 +292,13 @@ class PlayerActivity : AppCompatActivity() {
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private fun extractErrorReason(error: PlaybackException): String {
         val cause = error.cause
-        return if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
-            "HTTP ${cause.responseCode}"
-        } else {
-            error.errorCodeName
+        if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+            return "HTTP ${cause.responseCode}"
         }
+        val root = cause?.cause ?: cause
+        val rootName = root?.javaClass?.simpleName ?: error.errorCodeName
+        val rootMsg = root?.message?.take(60).orEmpty()
+        return if (rootMsg.isNotBlank()) "$rootName: $rootMsg" else rootName
     }
 
     private fun scheduleRetry(reason: String = "") {
