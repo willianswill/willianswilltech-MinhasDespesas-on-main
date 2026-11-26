@@ -4,6 +4,7 @@ import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -12,7 +13,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Rational
+import android.view.GestureDetector
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.widget.SeekBar
 import android.widget.Toast
@@ -23,6 +26,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.media3.common.C
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
@@ -70,6 +74,8 @@ class PlayerActivity : AppCompatActivity() {
     private var isAutoQuality = true
     private var rebufferCountInWindow = 0
     private var lastReadyAtMs = 0L
+    private var overlayAdapter: PlayerChannelOverlayAdapter? = null
+    private val hideGestureRunnable = Runnable { binding.tvGestureFeedback.visibility = View.GONE }
 
     private val resizeModes = listOf(
         AspectRatioFrameLayout.RESIZE_MODE_FIT to "Ajustar",
@@ -119,7 +125,119 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         setupUiActions()
+        setupChannelDrawer()
+        setupPlayerGestures()
         startPlayback(isRetry = false)
+    }
+
+    private fun setupChannelDrawer() {
+        if (items.size <= 1) {
+            binding.btnChannelList.visibility = View.GONE
+            return
+        }
+        binding.rvPlayerChannels.layoutManager = LinearLayoutManager(this)
+        overlayAdapter = PlayerChannelOverlayAdapter(items, currentIndex) { selectedIdx ->
+            closeChannelDrawer()
+            if (selectedIdx != currentIndex) {
+                saveCurrentWatchProgress()
+                currentIndex = selectedIdx
+                retryCount = 0
+                overrideCatchupUrl = null
+                externalSubUri = null
+                currentVariant = null
+                activeVariants = emptyList()
+                startPlayback(isRetry = false)
+            }
+        }
+        binding.rvPlayerChannels.adapter = overlayAdapter
+    }
+
+    private fun openChannelDrawer() {
+        hideControls()
+        overlayAdapter?.updateSelected(currentIndex)
+        binding.channelDrawer.visibility = View.VISIBLE
+        binding.rvPlayerChannels.scrollToPosition(currentIndex)
+        binding.rvPlayerChannels.requestFocus()
+    }
+
+    private fun closeChannelDrawer() {
+        binding.channelDrawer.visibility = View.GONE
+    }
+
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun setupPlayerGestures() {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                if (binding.channelDrawer.visibility == View.VISIBLE) {
+                    closeChannelDrawer()
+                } else {
+                    toggleControls()
+                }
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                val exo = player ?: return true
+                val item = items.getOrNull(currentIndex) ?: return true
+                if (item.mediaType == MediaType.LIVE && overrideCatchupUrl == null) {
+                    return true
+                }
+                val width = binding.playerView.width.coerceAtLeast(1)
+                val isRight = e.x > width / 2f
+                val delta = if (isRight) 10_000L else -10_000L
+                val target = (exo.currentPosition + delta).coerceIn(0L, exo.duration.coerceAtLeast(0L))
+                exo.seekTo(target)
+                showGestureFeedback(if (isRight) "+10s ⏩" else "⏪ -10s")
+                return true
+            }
+
+            override fun onScroll(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                distanceX: Float,
+                distanceY: Float
+            ): Boolean {
+                if (kotlin.math.abs(distanceY) <= kotlin.math.abs(distanceX)) return false
+                val width = binding.playerView.width.coerceAtLeast(1)
+                val height = binding.playerView.height.coerceAtLeast(1)
+                val isLeft = (e1?.x ?: e2.x) < width / 2f
+                val deltaRatio = distanceY / height
+
+                if (isLeft) {
+                    val lp = window.attributes
+                    val cur = if (lp.screenBrightness < 0f) 0.5f else lp.screenBrightness
+                    val next = (cur + deltaRatio * 1.4f).coerceIn(0.05f, 1.0f)
+                    lp.screenBrightness = next
+                    window.attributes = lp
+                    showGestureFeedback("☀ Brilho: ${(next * 100).toInt()}%")
+                } else {
+                    val curVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    val step = if (distanceY > 0) 1 else -1
+                    val nextVol = (curVol + step).coerceIn(0, maxVol)
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, nextVol, 0)
+                    val pct = (nextVol * 100) / maxVol
+                    showGestureFeedback("🔊 Volume: $pct%")
+                }
+                return true
+            }
+        })
+
+        binding.playerView.setOnTouchListener { _, event ->
+            detector.onTouchEvent(event)
+            true
+        }
+    }
+
+    private fun showGestureFeedback(text: String) {
+        binding.tvGestureFeedback.text = text
+        binding.tvGestureFeedback.visibility = View.VISIBLE
+        handler.removeCallbacks(hideGestureRunnable)
+        handler.postDelayed(hideGestureRunnable, 1200L)
     }
 
     private fun hideSystemBars() {
@@ -130,8 +248,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun setupUiActions() {
-        binding.playerView.setOnClickListener { toggleControls() }
         binding.btnBack.setOnClickListener { finish() }
+        binding.btnChannelList.setOnClickListener { openChannelDrawer() }
+        binding.btnCloseDrawer.setOnClickListener { closeChannelDrawer() }
 
         binding.btnPlayPause.setOnClickListener {
             val p = player ?: return@setOnClickListener
@@ -663,8 +782,22 @@ class PlayerActivity : AppCompatActivity() {
                     super.onKeyDown(keyCode, event)
                 }
             }
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (binding.channelDrawer.visibility != View.VISIBLE &&
+                    binding.controlsOverlay.visibility != View.VISIBLE &&
+                    items.size > 1
+                ) {
+                    openChannelDrawer()
+                    true
+                } else {
+                    super.onKeyDown(keyCode, event)
+                }
+            }
             KeyEvent.KEYCODE_BACK -> {
-                if (binding.controlsOverlay.visibility == View.VISIBLE) {
+                if (binding.channelDrawer.visibility == View.VISIBLE) {
+                    closeChannelDrawer()
+                    true
+                } else if (binding.controlsOverlay.visibility == View.VISIBLE) {
                     hideControls()
                     true
                 } else {

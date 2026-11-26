@@ -133,4 +133,8 @@
         </LinearLayout>
     </LinearLayout>
 
+    <include
+        android:id="@+id/quick_nav"
+        layout="@layout/view_quick_nav" />
+
 </LinearLayout>

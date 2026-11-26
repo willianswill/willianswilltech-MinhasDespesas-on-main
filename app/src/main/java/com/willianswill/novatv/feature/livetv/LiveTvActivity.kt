@@ -20,6 +20,8 @@ import com.willianswill.novatv.core.player.NovaPlayerFactory
 import com.willianswill.novatv.core.player.PlayableItem
 import com.willianswill.novatv.core.player.PlayerActivity
 import com.willianswill.novatv.core.player.QualityVariant
+import com.willianswill.novatv.core.ui.NavTab
+import com.willianswill.novatv.core.ui.QuickNavHelper
 import com.willianswill.novatv.databinding.ActivityLiveTvBinding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -54,6 +56,7 @@ class LiveTvActivity : AppCompatActivity() {
 
         setupLists()
         setupActions()
+        QuickNavHelper.bind(this, binding.quickNav.root, NavTab.LIVE)
         observeProfile()
     }
 

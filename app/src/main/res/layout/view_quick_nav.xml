@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/bg_surface"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="6dp"
+    android:paddingVertical="6dp">
+
+    <Button
+        android:id="@+id/nav_home"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/selector_cinema_button"
+        android:focusable="true"
+        android:maxLines="1"
+        android:padding="0dp"
+        android:text="🏠 Início"
+        android:textColor="@color/text_primary"
+        android:textSize="11sp" />
+
+    <Button
+        android:id="@+id/nav_live"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/selector_cinema_button"
+        android:focusable="true"
+        android:maxLines="1"
+        android:padding="0dp"
+        android:text="📺 TV"
+        android:textColor="@color/text_primary"
+        android:textSize="11sp" />
+
+    <Button
+        android:id="@+id/nav_movies"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/selector_cinema_button"
+        android:focusable="true"
+        android:maxLines="1"
+        android:padding="0dp"
+        android:text="🎬 Filmes"
+        android:textColor="@color/text_primary"
+        android:textSize="11sp" />
+
+    <Button
+        android:id="@+id/nav_series"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/selector_cinema_button"
+        android:focusable="true"
+        android:maxLines="1"
+        android:padding="0dp"
+        android:text="🎞️ Séries"
+        android:textColor="@color/text_primary"
+        android:textSize="11sp" />
+
+    <Button
+        android:id="@+id/nav_settings"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="0dp"
+        android:layout_height="40dp"
+        android:layout_weight="1"
+        android:background="@drawable/selector_cinema_button"
+        android:focusable="true"
+        android:maxLines="1"
+        android:padding="0dp"
+        android:text="⚙ Config"
+        android:textColor="@color/text_primary"
+        android:textSize="11sp" />
+
+</LinearLayout>

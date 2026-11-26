@@ -22,6 +22,8 @@ import com.willianswill.novatv.core.network.XtreamApiClient
 import com.willianswill.novatv.core.player.AppPreferences
 import com.willianswill.novatv.core.player.PlayableItem
 import com.willianswill.novatv.core.player.PlayerActivity
+import com.willianswill.novatv.core.ui.NavTab
+import com.willianswill.novatv.core.ui.QuickNavHelper
 import com.willianswill.novatv.databinding.ActivityVodCatalogBinding
 import com.willianswill.novatv.feature.livetv.CategoryTabAdapter
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +66,11 @@ class VodCatalogActivity : AppCompatActivity() {
 
         setupLists()
         setupActions()
+        QuickNavHelper.bind(
+            this,
+            binding.quickNav.root,
+            if (mode == MediaType.SERIES) NavTab.SERIES else NavTab.MOVIES
+        )
         observeProfile()
     }
 

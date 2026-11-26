@@ -68,4 +68,8 @@
         android:layout_weight="1"
         android:clipToPadding="false" />
 
+    <include
+        android:id="@+id/quick_nav"
+        layout="@layout/view_quick_nav" />
+
 </LinearLayout>

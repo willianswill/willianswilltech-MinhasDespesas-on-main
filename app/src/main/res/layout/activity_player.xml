@@ -44,6 +44,68 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Gesture Feedback Pill (Brilho / Volume / -10s / +10s) -->
+    <TextView
+        android:id="@+id/tv_gesture_feedback"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="36dp"
+        android:background="@drawable/bg_player_pill"
+        android:paddingHorizontal="18dp"
+        android:paddingVertical="8dp"
+        android:text="🔊 Volume: 80%"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Translucent Side Channel Drawer inside Player -->
+    <LinearLayout
+        android:id="@+id/channel_drawer"
+        android:layout_width="270dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="#E607090F"
+        android:orientation="vertical"
+        android:padding="14dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingBottom="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Lista Rápida"
+                android:textColor="#38BDF8"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btn_close_drawer"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:background="@drawable/selector_player_btn"
+                android:focusable="true"
+                android:paddingHorizontal="10dp"
+                android:text="✕"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_player_channels"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+    </LinearLayout>
+
     <!-- OSD Controls Overlay -->
     <RelativeLayout
         android:id="@+id/controls_overlay"
@@ -231,6 +293,18 @@
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1" />
+
+                <Button
+                    android:id="@+id/btn_channel_list"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/selector_player_btn"
+                    android:focusable="true"
+                    android:paddingHorizontal="12dp"
+                    android:text="☰ Lista"
+                    android:textColor="#FFFFFF" />
 
                 <Button
                     android:id="@+id/btn_quality"
