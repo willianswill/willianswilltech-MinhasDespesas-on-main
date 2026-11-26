@@ -21,8 +21,9 @@ interface StreamDao {
           AND (:categoryId IS NULL OR categoryId = :categoryId)
           AND (:onlyFavorites = 0 OR isFavorite = 1)
           AND (:includeAdult = 1 OR isAdult = 0)
-          AND (:query = '' OR name LIKE '%' || :query || '%')
-        ORDER BY id ASC
+          AND (:query = '' OR baseName LIKE '%' || :query || '%' OR name LIKE '%' || :query || '%')
+        GROUP BY categoryId, baseName
+        ORDER BY MIN(id) ASC
         """
     )
     fun pagingSource(
@@ -33,6 +34,23 @@ interface StreamDao {
         includeAdult: Boolean,
         query: String
     ): PagingSource<Int, StreamEntity>
+
+    @Query(
+        """
+        SELECT * FROM streams
+        WHERE profileId = :profileId
+          AND mediaType = :mediaType
+          AND categoryId = :categoryId
+          AND baseName = :baseName
+        ORDER BY qualityRank DESC, id ASC
+        """
+    )
+    suspend fun getVariants(
+        profileId: Long,
+        mediaType: String,
+        categoryId: String,
+        baseName: String
+    ): List<StreamEntity>
 
     @Query(
         """

@@ -32,7 +32,7 @@ class LiveChannelPagingAdapter(
 
     inner class VH(private val binding: ItemLiveChannelBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(item: StreamEntity, pos: Int) {
-            binding.tvName.text = item.name
+            binding.tvName.text = item.baseName
             binding.tvGroup.text = item.categoryName
             binding.btnFav.text = if (item.isFavorite) "★" else "☆"
 

@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
     tableName = "streams",
     indices = [
         Index(value = ["profileId", "mediaType", "categoryId"]),
+        Index(value = ["profileId", "mediaType", "categoryId", "baseName"]),
         Index(value = ["profileId", "mediaType", "name"]),
         Index(value = ["profileId", "isFavorite"]),
         Index(value = ["profileId", "streamUrl"], unique = true)
@@ -19,6 +20,9 @@ data class StreamEntity(
     val streamId: String,
     val mediaType: String, // MediaType.LIVE or MediaType.MOVIE
     val name: String,
+    val baseName: String = name,
+    val qualityLabel: String = "Padrão",
+    val qualityRank: Int = 2, // 1=SD, 2=HD, 3=FHD, 4=4K
     val streamUrl: String,
     val iconUrl: String = "",
     val categoryId: String = "",

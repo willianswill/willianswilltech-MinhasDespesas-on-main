@@ -1,8 +1,11 @@
 package com.willianswill.novatv.core.player
 
 import android.app.PictureInPictureParams
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -60,6 +63,12 @@ class PlayerActivity : AppCompatActivity() {
     private var overrideCatchupUrl: String? = null
     private var externalSubUri: Uri? = null
 
+    private var activeVariants: List<QualityVariant> = emptyList()
+    private var currentVariant: QualityVariant? = null
+    private var isAutoQuality = true
+    private var rebufferCountInWindow = 0
+    private var lastReadyAtMs = 0L
+
     private val resizeModes = listOf(
         AspectRatioFrameLayout.RESIZE_MODE_FIT to "Ajustar",
         AspectRatioFrameLayout.RESIZE_MODE_FILL to "Esticar",
@@ -69,6 +78,12 @@ class PlayerActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val hideControlsRunnable = Runnable { hideControls() }
     private val retryRunnable = Runnable { startPlayback(isRetry = true) }
+    private val abrCheckRunnable = object : Runnable {
+        override fun run() {
+            evaluateAdaptiveUpgrade()
+            handler.postDelayed(this, 20_000L)
+        }
+    }
     private val progressRunnable = object : Runnable {
         override fun run() {
             updateSeekProgress()
@@ -151,6 +166,11 @@ class PlayerActivity : AppCompatActivity() {
             scheduleHideControls()
         }
 
+        binding.btnQuality.setOnClickListener {
+            showQualityDialog()
+            scheduleHideControls()
+        }
+
         binding.btnCatchup.setOnClickListener {
             showCatchupDialog()
             scheduleHideControls()
@@ -194,13 +214,26 @@ class PlayerActivity : AppCompatActivity() {
         retryCount = 0
         overrideCatchupUrl = null
         externalSubUri = null
+        currentVariant = null
+        activeVariants = emptyList()
         startPlayback(isRetry = false)
         showControls()
     }
 
     private fun startPlayback(isRetry: Boolean) {
         handler.removeCallbacks(retryRunnable)
+        handler.removeCallbacks(abrCheckRunnable)
         val item = items.getOrNull(currentIndex) ?: return
+
+        if (activeVariants.isEmpty()) {
+            activeVariants = item.variants.sortedByDescending { it.rank }
+            if (activeVariants.size > 1 && isAutoQuality) {
+                currentVariant = pickBestVariantForSpeed(activeVariants, getEstimatedSpeedMbps())
+            } else {
+                currentVariant = activeVariants.firstOrNull()
+            }
+        }
+        updateQualityButtonUi()
 
         binding.tvTitle.text = item.title
         binding.tvSubtitle.text = item.subtitle
@@ -209,23 +242,34 @@ class PlayerActivity : AppCompatActivity() {
         val isVod = item.mediaType != MediaType.LIVE || overrideCatchupUrl != null
         binding.seekContainer.visibility = if (isVod) View.VISIBLE else View.GONE
 
-        showLoading(if (isRetry) "Reconectando ($retryCount/$MAX_RETRY)..." else "Carregando ${item.title}...")
+        val chosen = currentVariant
+        val qualitySuffix = if (chosen != null && activeVariants.size > 1) " (${chosen.label})" else ""
+        showLoading(if (isRetry) "Reconectando ($retryCount/$MAX_RETRY)..." else "Carregando ${item.title}$qualitySuffix...")
 
         releasePlayer()
 
         val exo = NovaPlayerFactory.createPlayer(
             context = this,
             bufferProfile = prefs.bufferProfile,
-            userAgent = item.userAgent,
-            referrer = item.referrer
+            userAgent = chosen?.userAgent ?: item.userAgent,
+            referrer = chosen?.referrer ?: item.referrer
         )
 
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
-                    Player.STATE_BUFFERING -> showLoading("Buffering...")
+                    Player.STATE_BUFFERING -> {
+                        showLoading("Buffering...")
+                        if (lastReadyAtMs > 0L && System.currentTimeMillis() - lastReadyAtMs < 20_000L) {
+                            rebufferCountInWindow++
+                            if (rebufferCountInWindow >= 2 && isAutoQuality && activeVariants.size > 1) {
+                                tryAdaptiveDowngrade()
+                            }
+                        }
+                    }
                     Player.STATE_READY -> {
                         retryCount = 0
+                        lastReadyAtMs = System.currentTimeMillis()
                         hideLoading()
                         binding.btnPlayPause.text = if (exo.isPlaying) "⏸ Pausar" else "▶ Retomar"
                         if (isVod && exo.duration > 0) {
@@ -245,6 +289,9 @@ class PlayerActivity : AppCompatActivity() {
 
             override fun onPlayerError(error: PlaybackException) {
                 val reason = extractErrorReason(error)
+                if (isAutoQuality && activeVariants.size > 1 && tryAdaptiveDowngrade()) {
+                    return
+                }
                 if (prefs.autoReconnect) {
                     scheduleRetry(reason)
                 } else {
@@ -254,7 +301,7 @@ class PlayerActivity : AppCompatActivity() {
             }
         })
 
-        val playUrl = overrideCatchupUrl ?: item.streamUrl
+        val playUrl = overrideCatchupUrl ?: chosen?.streamUrl ?: item.streamUrl
         val subMime = if (externalSubUri?.toString()?.lowercase()?.endsWith(".vtt") == true) {
             MimeTypes.TEXT_VTT
         } else {
@@ -274,6 +321,9 @@ class PlayerActivity : AppCompatActivity() {
         loadLiveEpgSubtitle(item)
         handler.removeCallbacks(progressRunnable)
         handler.post(progressRunnable)
+        if (isAutoQuality && activeVariants.size > 1 && overrideCatchupUrl == null) {
+            handler.postDelayed(abrCheckRunnable, 20_000L)
+        }
         scheduleHideControls()
     }
 
@@ -317,6 +367,93 @@ class PlayerActivity : AppCompatActivity() {
             Toast.makeText(this, "Não foi possível conectar ao canal$detail.", Toast.LENGTH_LONG).show()
             showControls()
         }
+    }
+
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun getEstimatedSpeedMbps(): Double {
+        val meterEstimate = NovaPlayerFactory.getBandwidthMeter(this).bitrateEstimate
+        if (meterEstimate > 0L && meterEstimate != Long.MAX_VALUE) {
+            return meterEstimate / 1_000_000.0
+        }
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val caps = cm?.getNetworkCapabilities(cm.activeNetwork)
+        val kbps = caps?.linkDownstreamBandwidthKbps ?: 0
+        return if (kbps > 0) kbps / 1000.0 else 5.0
+    }
+
+    private fun pickBestVariantForSpeed(variants: List<QualityVariant>, mbps: Double): QualityVariant {
+        val targetMaxRank = when {
+            mbps < 2.5 -> 1 // SD
+            mbps < 6.5 -> 2 // HD
+            mbps < 16.0 -> 3 // FHD
+            else -> 4 // 4K
+        }
+        return variants.firstOrNull { it.rank <= targetMaxRank } ?: variants.last()
+    }
+
+    private fun tryAdaptiveDowngrade(): Boolean {
+        val cur = currentVariant ?: return false
+        val lower = activeVariants.firstOrNull { it.rank < cur.rank } ?: return false
+        rebufferCountInWindow = 0
+        currentVariant = lower
+        Toast.makeText(this, "⚡ Rede lenta: ajustando para ${lower.label}", Toast.LENGTH_SHORT).show()
+        startPlayback(isRetry = false)
+        return true
+    }
+
+    private fun evaluateAdaptiveUpgrade() {
+        if (!isAutoQuality || activeVariants.size <= 1 || overrideCatchupUrl != null) return
+        if (rebufferCountInWindow > 0) {
+            rebufferCountInWindow = 0
+            return
+        }
+        val cur = currentVariant ?: return
+        val mbps = getEstimatedSpeedMbps()
+        val bestForSpeed = pickBestVariantForSpeed(activeVariants, mbps)
+        if (bestForSpeed.rank > cur.rank) {
+            currentVariant = bestForSpeed
+            val speedStr = String.format(Locale.getDefault(), "%.1f", mbps)
+            Toast.makeText(this, "⚡ Internet estável ($speedStr Mbps): subindo para ${bestForSpeed.label}", Toast.LENGTH_SHORT).show()
+            startPlayback(isRetry = false)
+        }
+    }
+
+    private fun updateQualityButtonUi() {
+        if (activeVariants.size <= 1) {
+            binding.btnQuality.visibility = View.GONE
+            return
+        }
+        binding.btnQuality.visibility = View.VISIBLE
+        val label = currentVariant?.label ?: "Padrão"
+        binding.btnQuality.text = if (isAutoQuality) "⚡ Auto ($label)" else "⚙ $label"
+    }
+
+    private fun showQualityDialog() {
+        if (activeVariants.isEmpty()) return
+        val mbps = String.format(Locale.getDefault(), "%.1f", getEstimatedSpeedMbps())
+        val labels = mutableListOf<String>()
+        val autoMark = if (isAutoQuality) "✓ " else ""
+        labels.add("${autoMark}⚡ Automático (Rede: $mbps Mbps)")
+        activeVariants.forEach { v ->
+            val mark = if (!isAutoQuality && currentVariant?.streamUrl == v.streamUrl) "✓ " else ""
+            labels.add("$mark${v.label}")
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Qualidade do Canal")
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which == 0) {
+                    isAutoQuality = true
+                    currentVariant = pickBestVariantForSpeed(activeVariants, getEstimatedSpeedMbps())
+                } else {
+                    isAutoQuality = false
+                    currentVariant = activeVariants[which - 1]
+                }
+                rebufferCountInWindow = 0
+                startPlayback(isRetry = false)
+            }
+            .setNegativeButton("Fechar", null)
+            .show()
     }
 
     private fun showTracksDialog() {

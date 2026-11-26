@@ -19,6 +19,7 @@ import com.willianswill.novatv.core.player.MultiViewActivity
 import com.willianswill.novatv.core.player.NovaPlayerFactory
 import com.willianswill.novatv.core.player.PlayableItem
 import com.willianswill.novatv.core.player.PlayerActivity
+import com.willianswill.novatv.core.player.QualityVariant
 import com.willianswill.novatv.databinding.ActivityLiveTvBinding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -177,7 +178,7 @@ class LiveTvActivity : AppCompatActivity() {
 
     private fun previewChannel(stream: StreamEntity) {
         currentPreviewStream = stream
-        binding.tvEpgNow.text = stream.name
+        binding.tvEpgNow.text = stream.baseName
         binding.tvEpgTimeline.text = "Carregando guia de programação..."
 
         miniPlayer?.release()
@@ -223,23 +224,40 @@ class LiveTvActivity : AppCompatActivity() {
 
         val start = (clickedPos - 60).coerceAtLeast(0)
         val end = (start + 120).coerceAtMost(snapshot.size)
-        val window = ArrayList(snapshot.subList(start, end).map { it.toPlayable() })
-        val relIdx = (clickedPos - start).coerceIn(0, (window.size - 1).coerceAtLeast(0))
+        val sub = snapshot.subList(start, end)
+        val relIdx = (clickedPos - start).coerceIn(0, (sub.size - 1).coerceAtLeast(0))
 
         miniPlayer?.release()
         miniPlayer = null
 
-        startActivity(
-            Intent(this, PlayerActivity::class.java).apply {
-                putExtra(PlayerActivity.EXTRA_ITEMS, window)
-                putExtra(PlayerActivity.EXTRA_INDEX, relIdx)
+        lifecycleScope.launch {
+            val clickedStream = sub[relIdx]
+            val dbVariants = repository.getChannelVariants(clickedStream)
+            val variants = dbVariants.map { v ->
+                QualityVariant(
+                    label = v.qualityLabel,
+                    rank = v.qualityRank,
+                    streamUrl = v.streamUrl,
+                    userAgent = v.userAgent,
+                    referrer = v.referrer
+                )
             }
-        )
+            val window = ArrayList(sub.mapIndexed { idx, s ->
+                if (idx == relIdx) s.toPlayable(variants) else s.toPlayable()
+            })
+
+            startActivity(
+                Intent(this@LiveTvActivity, PlayerActivity::class.java).apply {
+                    putExtra(PlayerActivity.EXTRA_ITEMS, window)
+                    putExtra(PlayerActivity.EXTRA_INDEX, relIdx)
+                }
+            )
+        }
     }
 
-    private fun StreamEntity.toPlayable() = PlayableItem(
+    private fun StreamEntity.toPlayable(variants: List<QualityVariant> = emptyList()) = PlayableItem(
         contentKey = streamUrl,
-        title = name,
+        title = baseName,
         subtitle = categoryName,
         streamUrl = streamUrl,
         iconUrl = iconUrl,
@@ -251,7 +269,8 @@ class LiveTvActivity : AppCompatActivity() {
         userAgent = userAgent,
         referrer = referrer,
         streamDbId = id,
-        isFavorite = isFavorite
+        isFavorite = isFavorite,
+        variants = variants
     )
 
     override fun onStop() {

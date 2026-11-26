@@ -12,9 +12,14 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import com.willianswill.novatv.core.network.HttpClientProvider
 
 object NovaPlayerFactory {
+
+    @OptIn(UnstableApi::class)
+    fun getBandwidthMeter(context: Context): DefaultBandwidthMeter =
+        DefaultBandwidthMeter.getSingletonInstance(context.applicationContext)
 
     @OptIn(UnstableApi::class)
     fun createPlayer(
@@ -55,6 +60,7 @@ object NovaPlayerFactory {
         return ExoPlayer.Builder(context, renderersFactory)
             .setLoadControl(loadControl)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setBandwidthMeter(getBandwidthMeter(context))
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
     }

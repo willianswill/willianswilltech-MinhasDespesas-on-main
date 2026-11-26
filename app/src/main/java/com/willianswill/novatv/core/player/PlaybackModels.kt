@@ -2,6 +2,14 @@ package com.willianswill.novatv.core.player
 
 import java.io.Serializable
 
+data class QualityVariant(
+    val label: String,
+    val rank: Int, // 1=SD, 2=HD, 3=FHD, 4=4K
+    val streamUrl: String,
+    val userAgent: String? = null,
+    val referrer: String? = null
+) : Serializable
+
 data class PlayableItem(
     val contentKey: String,
     val title: String,
@@ -17,5 +25,6 @@ data class PlayableItem(
     val referrer: String? = null,
     val resumePositionMs: Long = 0L,
     val streamDbId: Long = 0L,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    val variants: List<QualityVariant> = emptyList()
 ) : Serializable

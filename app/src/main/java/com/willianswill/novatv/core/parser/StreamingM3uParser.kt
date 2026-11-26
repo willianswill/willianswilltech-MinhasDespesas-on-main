@@ -133,12 +133,21 @@ object StreamingM3uParser {
                                     )
                                 }
 
+                                val parsedQuality = if (mediaType == MediaType.LIVE) {
+                                    ChannelQualityParser.parse(finalName)
+                                } else {
+                                    ParsedChannelQuality(finalName, "VOD", 2)
+                                }
+
                                 batch.add(
                                     StreamEntity(
                                         profileId = profileId,
                                         streamId = indexCounter.toString(),
                                         mediaType = mediaType,
                                         name = finalName,
+                                        baseName = parsedQuality.baseName,
+                                        qualityLabel = parsedQuality.qualityLabel,
+                                        qualityRank = parsedQuality.qualityRank,
                                         streamUrl = streamUrl,
                                         iconUrl = pendingLogo,
                                         categoryId = catId,

@@ -12,6 +12,7 @@ import com.willianswill.novatv.core.database.entity.SeriesEntity
 import com.willianswill.novatv.core.database.entity.StreamEntity
 import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
 import com.willianswill.novatv.core.network.XtreamApiClient
+import com.willianswill.novatv.core.parser.ChannelQualityParser
 import com.willianswill.novatv.core.parser.StreamingM3uParser
 import com.willianswill.novatv.core.parser.StreamingXmltvParser
 import kotlinx.coroutines.Dispatchers
@@ -145,6 +146,16 @@ class IptvRepository(context: Context) {
             epgDao.getProgramsInRange(profileId, channelId, fromMs, toMs)
         }
 
+    suspend fun getChannelVariants(stream: StreamEntity): List<StreamEntity> =
+        withContext(Dispatchers.IO) {
+            streamDao.getVariants(
+                profileId = stream.profileId,
+                mediaType = stream.mediaType,
+                categoryId = stream.categoryId,
+                baseName = stream.baseName
+            )
+        }
+
     suspend fun syncActiveProfile(): ProfileEntity? = withContext(Dispatchers.IO) {
         val profile = profileDao.getActiveProfile() ?: return@withContext null
         when (profile.type) {
@@ -237,11 +248,15 @@ class IptvRepository(context: Context) {
                 val url = xtreamClient.buildLiveUrl(profile.serverUrl, profile.username, profile.password, dto.streamId, "ts")
                 val catId = dto.categoryId.orEmpty()
                 val catName = catNameMap["L_$catId"] ?: "Ao Vivo"
+                val parsedQ = ChannelQualityParser.parse(dto.name)
                 StreamEntity(
                     profileId = profile.id,
                     streamId = dto.streamId.toString(),
                     mediaType = MediaType.LIVE,
                     name = dto.name,
+                    baseName = parsedQ.baseName,
+                    qualityLabel = parsedQ.qualityLabel,
+                    qualityRank = parsedQ.qualityRank,
                     streamUrl = url,
                     iconUrl = dto.streamIcon.orEmpty(),
                     categoryId = catId,
