@@ -27,6 +27,9 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Prepare Fixed Signing Keystore
+        run: openssl pkcs12 -export -in app/wtv-cert.pem -inkey app/wtv-key.pem -out app/wtv-signing.p12 -name wtv -passout pass:wtv_canais_online_key
+
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon
 
