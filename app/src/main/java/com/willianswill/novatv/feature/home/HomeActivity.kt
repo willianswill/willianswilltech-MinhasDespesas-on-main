@@ -3,6 +3,8 @@ package com.willianswill.novatv.feature.home
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.ProgressBar
 import android.widget.Toast
@@ -10,8 +12,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.bumptech.glide.Glide
-import com.willianswill.novatv.R
+import androidx.viewpager2.widget.ViewPager2
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
@@ -29,9 +30,11 @@ import com.willianswill.novatv.feature.livetv.LiveTvActivity
 import com.willianswill.novatv.feature.playlists.PlaylistsActivity
 import com.willianswill.novatv.feature.profiles.ProfilePickerActivity
 import com.willianswill.novatv.feature.settings.SettingsActivity
+import com.willianswill.novatv.feature.vod.SeriesDetailActivity
 import com.willianswill.novatv.feature.vod.VodCatalogActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -41,6 +44,7 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var repository: IptvRepository
     private lateinit var prefs: AppPreferences
 
+    private lateinit var heroBannerAdapter: HeroBannerAdapter
     private lateinit var recentChannelsAdapter: HomeCarouselAdapter
     private lateinit var recentSeriesAdapter: HomeCarouselAdapter
     private lateinit var recentMoviesAdapter: HomeCarouselAdapter
@@ -48,9 +52,20 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var recentAddedAdapter: HomeCarouselAdapter
 
     private var favPlayables: List<PlayableItem> = emptyList()
-    private var heroPlayable: PlayableItem? = null
+    private var bannerCount = 0
     private var profileDataJob: Job? = null
     private var startupSyncTriggered = false
+
+    private val bannerHandler = Handler(Looper.getMainLooper())
+    private val autoRotateBanner = object : Runnable {
+        override fun run() {
+            if (bannerCount > 1) {
+                val next = (binding.vpHeroBanners.currentItem + 1) % bannerCount
+                binding.vpHeroBanners.setCurrentItem(next, true)
+            }
+            bannerHandler.postDelayed(this, 6000L)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,9 +88,42 @@ class HomeActivity : AppCompatActivity() {
         val user = UserProfileManager.getActiveUser(this)
         val avatar = UserProfileManager.getAvatar(user.avatarId)
         binding.btnSwitchProfile.text = "${avatar.emoji} ${user.name}"
+        bannerHandler.removeCallbacks(autoRotateBanner)
+        bannerHandler.postDelayed(autoRotateBanner, 6000L)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        bannerHandler.removeCallbacks(autoRotateBanner)
     }
 
     private fun setupCarousels() {
+        heroBannerAdapter = HeroBannerAdapter { banner ->
+            when (banner) {
+                is FeaturedBannerItem.MovieBanner -> launchPlayer(listOf(banner.playable), 0)
+                is FeaturedBannerItem.SeriesBanner -> {
+                    val s = banner.series
+                    startActivity(
+                        Intent(this, SeriesDetailActivity::class.java).apply {
+                            putExtra(SeriesDetailActivity.EXTRA_SERIES_DB_ID, s.id)
+                            putExtra(SeriesDetailActivity.EXTRA_SERIES_ID, s.seriesId)
+                            putExtra(SeriesDetailActivity.EXTRA_NAME, s.name)
+                            putExtra(SeriesDetailActivity.EXTRA_COVER, s.coverUrl)
+                            putExtra(SeriesDetailActivity.EXTRA_CATEGORY, s.categoryName)
+                            putExtra(SeriesDetailActivity.EXTRA_PLOT, s.plot)
+                            putExtra(SeriesDetailActivity.EXTRA_RATING, s.rating)
+                            putExtra(SeriesDetailActivity.EXTRA_IS_FAV, s.isFavorite)
+                        }
+                    )
+                }
+            }
+        }
+        binding.vpHeroBanners.adapter = heroBannerAdapter
+        binding.vpHeroBanners.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                binding.tvBannerCounter.text = "${position + 1}/${bannerCount.coerceAtLeast(1)}"
+            }
+        })
         val openDirect: (List<PlayableItem>, Int) -> Unit = { list, idx ->
             launchPlayer(list, idx)
         }
@@ -138,11 +186,20 @@ class HomeActivity : AppCompatActivity() {
         binding.cardMovies.enableCinemaFocusZoom(1.05f)
         binding.cardSeries.enableCinemaFocusZoom(1.05f)
         binding.cardMultiview.enableCinemaFocusZoom(1.05f)
-        binding.btnHeroPlay.enableCinemaFocusZoom(1.05f)
+        binding.btnBannerPrev.enableCinemaFocusZoom(1.06f)
+        binding.btnBannerNext.enableCinemaFocusZoom(1.06f)
 
-        binding.btnHeroPlay.setOnClickListener {
-            val item = heroPlayable ?: return@setOnClickListener
-            launchPlayer(listOf(item), 0)
+        binding.btnBannerPrev.setOnClickListener {
+            if (bannerCount > 1) {
+                val prev = (binding.vpHeroBanners.currentItem - 1 + bannerCount) % bannerCount
+                binding.vpHeroBanners.setCurrentItem(prev, true)
+            }
+        }
+        binding.btnBannerNext.setOnClickListener {
+            if (bannerCount > 1) {
+                val next = (binding.vpHeroBanners.currentItem + 1) % bannerCount
+                binding.vpHeroBanners.setCurrentItem(next, true)
+            }
         }
 
         binding.btnSwitchProfile.setOnClickListener {
@@ -199,7 +256,7 @@ class HomeActivity : AppCompatActivity() {
                 if (profile == null) {
                     binding.tvActiveProfile.text = "Nenhum servidor conectado"
                     binding.bannerNoProfile.visibility = View.VISIBLE
-                    binding.heroBannerContainer.visibility = View.GONE
+                    binding.heroCarouselContainer.visibility = View.GONE
                     toggleSection(binding.tvSectionRecentChannels, binding.rvRecentChannels, false)
                     toggleSection(binding.tvSectionRecentSeries, binding.rvRecentSeries, false)
                     toggleSection(binding.tvSectionRecentMovies, binding.rvRecentMovies, false)
@@ -247,9 +304,6 @@ class HomeActivity : AppCompatActivity() {
                             val mapped = list.map { it.toCarouselItem() }
                             recentMoviesAdapter.submitList(mapped)
                             toggleSection(binding.tvSectionRecentMovies, binding.rvRecentMovies, mapped.isNotEmpty())
-                            if (mapped.isNotEmpty()) {
-                                updateHeroBanner(mapped.first().playable, "▶ CONTINUAR ASSISTINDO", "▶ Continuar")
-                            }
                         }
                     }
 
@@ -281,8 +335,11 @@ class HomeActivity : AppCompatActivity() {
                     }
 
                     launch {
-                        repository.observeRecentlyAdded(profile.id, MediaType.MOVIE, includeAdult).collectLatest { list ->
-                            val mapped = list.map { s ->
+                        combine(
+                            repository.observeRecentlyAdded(profile.id, MediaType.MOVIE, includeAdult),
+                            repository.observeRecentSeries(profile.id, includeAdult)
+                        ) { movies, series ->
+                            val moviePlayables = movies.map { s ->
                                 HomeCarouselItem(
                                     PlayableItem(
                                         contentKey = s.streamUrl,
@@ -299,10 +356,51 @@ class HomeActivity : AppCompatActivity() {
                                     )
                                 )
                             }
-                            recentAddedAdapter.submitList(mapped)
-                            toggleSection(binding.tvSectionRecent, binding.rvRecent, mapped.isNotEmpty())
-                            if (heroPlayable == null && mapped.isNotEmpty()) {
-                                updateHeroBanner(mapped.first().playable, "✨ ADICIONADO RECENTEMENTE", "▶ Assistir Agora")
+
+                            val movieBanners = movies.take(6).map { s ->
+                                FeaturedBannerItem.MovieBanner(
+                                    playable = PlayableItem(
+                                        contentKey = s.streamUrl,
+                                        title = s.name,
+                                        subtitle = s.categoryName,
+                                        streamUrl = s.streamUrl,
+                                        iconUrl = s.iconUrl,
+                                        mediaType = s.mediaType,
+                                        streamId = s.streamId,
+                                        userAgent = s.userAgent,
+                                        referrer = s.referrer,
+                                        streamDbId = s.id,
+                                        isFavorite = s.isFavorite
+                                    ),
+                                    rating = s.rating,
+                                    timestamp = s.addedAt
+                                )
+                            }
+                            val seriesBanners = series.take(6).map { sr ->
+                                FeaturedBannerItem.SeriesBanner(
+                                    series = sr,
+                                    timestamp = sr.lastModified
+                                )
+                            }
+                            val combinedBanners = (movieBanners + seriesBanners)
+                                .sortedByDescending {
+                                    when (it) {
+                                        is FeaturedBannerItem.MovieBanner -> it.timestamp
+                                        is FeaturedBannerItem.SeriesBanner -> it.timestamp
+                                    }
+                                }
+                                .take(10)
+
+                            moviePlayables to combinedBanners
+                        }.collectLatest { (moviePlayables, combinedBanners) ->
+                            recentAddedAdapter.submitList(moviePlayables)
+                            toggleSection(binding.tvSectionRecent, binding.rvRecent, moviePlayables.isNotEmpty())
+
+                            bannerCount = combinedBanners.size
+                            heroBannerAdapter.submitList(combinedBanners)
+                            binding.heroCarouselContainer.visibility = if (bannerCount > 0) View.VISIBLE else View.GONE
+                            if (bannerCount > 0) {
+                                binding.tvBannerCounter.text = "${binding.vpHeroBanners.currentItem + 1}/$bannerCount"
                             }
                         }
                     }
@@ -382,22 +480,6 @@ class HomeActivity : AppCompatActivity() {
             }
             .setNegativeButton("Depois", null)
             .show()
-    }
-
-    private fun updateHeroBanner(item: PlayableItem, badge: String, buttonText: String) {
-        heroPlayable = item
-        binding.heroBannerContainer.visibility = View.VISIBLE
-        binding.tvHeroBadge.text = badge
-        binding.tvHeroTitle.text = item.title
-        binding.tvHeroSub.text = item.subtitle
-        binding.btnHeroPlay.text = buttonText
-        if (item.iconUrl.isNotBlank()) {
-            Glide.with(this)
-                .load(item.iconUrl)
-                .placeholder(R.drawable.ic_tv_logo)
-                .error(R.drawable.ic_tv_logo)
-                .into(binding.ivHeroBackdrop)
-        }
     }
 
     private fun toggleSection(header: View, list: View, visible: Boolean) {

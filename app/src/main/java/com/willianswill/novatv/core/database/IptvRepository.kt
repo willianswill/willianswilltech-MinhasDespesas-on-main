@@ -123,6 +123,9 @@ class IptvRepository(context: Context) {
     fun observeRecentlyAdded(profileId: Long, mediaType: String, includeAdult: Boolean) =
         streamDao.observeRecentlyAdded(profileId, mediaType, includeAdult)
 
+    fun observeRecentSeries(profileId: Long, includeAdult: Boolean) =
+        seriesDao.observeRecentlyAdded(profileId, includeAdult)
+
     fun observeContinueWatching(profileId: Long) =
         historyDao.observeContinueWatching(profileId, UserProfileManager.getActiveUserId(appContext))
 
