@@ -3,10 +3,12 @@ package com.willianswill.novatv.core.parser
 import com.willianswill.novatv.core.database.entity.EpgProgramEntity
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
+import java.io.BufferedInputStream
 import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import java.util.zip.GZIPInputStream
 
 object StreamingXmltvParser {
 
@@ -18,11 +20,23 @@ object StreamingXmltvParser {
         input: InputStream,
         onProgramsChunk: suspend (List<EpgProgramEntity>) -> Unit
     ): Int {
+        val buffered = BufferedInputStream(input, 32 * 1024)
+        buffered.mark(4)
+        val b0 = buffered.read()
+        val b1 = buffered.read()
+        buffered.reset()
+
+        val actualStream: InputStream = if (b0 == 0x1f && b1 == 0x8b) {
+            GZIPInputStream(buffered)
+        } else {
+            buffered
+        }
+
         val factory = XmlPullParserFactory.newInstance().apply { isNamespaceAware = false }
         val parser = factory.newPullParser()
-        parser.setInput(input, "UTF-8")
+        parser.setInput(actualStream, "UTF-8")
 
-        val formatWithTz = SimpleDateFormat("yyyyMMddHHmmss Z", Locale.US)
+        val formatWithTz = SimpleDateFormat("yyyyMMddHHmmssZ", Locale.US)
         val formatNoTz = SimpleDateFormat("yyyyMMddHHmmss", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }
@@ -46,7 +60,7 @@ object StreamingXmltvParser {
                     currentTag = parser.name.lowercase()
                     if (currentTag == "programme") {
                         inProgramme = true
-                        channelId = parser.getAttributeValue(null, "channel")?.trim().orEmpty()
+                        channelId = parser.getAttributeValue(null, "channel")?.trim()?.lowercase().orEmpty()
                         startMs = parseXmltvDate(parser.getAttributeValue(null, "start"), formatWithTz, formatNoTz)
                         endMs = parseXmltvDate(parser.getAttributeValue(null, "stop"), formatWithTz, formatNoTz)
                         title = ""
@@ -108,12 +122,15 @@ object StreamingXmltvParser {
         noTz: SimpleDateFormat
     ): Long {
         if (raw.isNullOrBlank()) return 0L
-        val cleaned = raw.trim()
+        // Normaliza "20261126113000 -03:00" ou "20261126113000 -0300" -> "20261126113000-0300"
+        val compact = raw.trim().replace(" ", "").replace(":", "")
         return try {
-            if (cleaned.length > 14) {
-                withTz.parse(cleaned)?.time ?: 0L
+            if (compact.length >= 19) {
+                withTz.parse(compact.substring(0, 19))?.time ?: 0L
+            } else if (compact.length >= 14) {
+                noTz.parse(compact.substring(0, 14))?.time ?: 0L
             } else {
-                noTz.parse(cleaned)?.time ?: 0L
+                0L
             }
         } catch (_: Exception) {
             0L

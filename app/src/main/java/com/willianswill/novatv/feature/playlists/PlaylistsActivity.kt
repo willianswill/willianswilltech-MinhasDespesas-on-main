@@ -165,11 +165,11 @@ class PlaylistsActivity : AppCompatActivity() {
                 val saved = profile.copy(id = id, isActive = true)
                 val synced = repository.syncActiveProfile() ?: saved
                 setBusy(true, "Sincronizando EPG (Guia de Programação)...")
-                runCatching { repository.syncEpgForProfile(synced) }
+                val epgCount = runCatching { repository.syncEpgForProfile(synced) }.getOrDefault(0)
                 setBusy(false)
                 Toast.makeText(
                     this@PlaylistsActivity,
-                    "Sincronizado: ${synced.totalChannels} canais, ${synced.totalMovies} filmes!",
+                    "Sincronizado: ${synced.totalChannels} canais, ${synced.totalMovies} filmes, $epgCount programas EPG!",
                     Toast.LENGTH_LONG
                 ).show()
                 finish()
@@ -186,11 +186,13 @@ class PlaylistsActivity : AppCompatActivity() {
             try {
                 repository.setActiveProfile(profile.id)
                 val synced = repository.syncActiveProfile()
+                var epgCount = 0
                 if (synced != null && synced.epgUrl.isNotBlank()) {
-                    runCatching { repository.syncEpgForProfile(synced) }
+                    setBusy(true, "Atualizando EPG...")
+                    epgCount = runCatching { repository.syncEpgForProfile(synced) }.getOrDefault(0)
                 }
                 setBusy(false)
-                Toast.makeText(this@PlaylistsActivity, "Catálogo atualizado!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@PlaylistsActivity, "Catálogo atualizado ($epgCount programas EPG)!", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 setBusy(false)
                 Toast.makeText(this@PlaylistsActivity, "Falha ao atualizar: ${e.message}", Toast.LENGTH_LONG).show()

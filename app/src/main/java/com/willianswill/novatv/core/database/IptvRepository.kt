@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.io.InputStream
 
 class IptvRepository(context: Context) {
@@ -149,14 +150,16 @@ class IptvRepository(context: Context) {
     }
 
     suspend fun getCurrentEpg(profileId: Long, channelId: String) = withContext(Dispatchers.IO) {
-        if (channelId.isBlank()) return@withContext null
-        epgDao.getCurrentProgram(profileId, channelId, System.currentTimeMillis())
+        val key = channelId.trim().lowercase()
+        if (key.isBlank()) return@withContext null
+        epgDao.getCurrentProgram(profileId, key, System.currentTimeMillis())
     }
 
     suspend fun getEpgInRange(profileId: Long, channelId: String, fromMs: Long, toMs: Long) =
         withContext(Dispatchers.IO) {
-            if (channelId.isBlank()) return@withContext emptyList()
-            epgDao.getProgramsInRange(profileId, channelId, fromMs, toMs)
+            val key = channelId.trim().lowercase()
+            if (key.isBlank()) return@withContext emptyList()
+            epgDao.getProgramsInRange(profileId, key, fromMs, toMs)
         }
 
     suspend fun getChannelVariants(stream: StreamEntity): List<StreamEntity> =
@@ -389,8 +392,9 @@ class IptvRepository(context: Context) {
                 }
             )
 
+            val derivedEpg = deriveXmltvFromM3uUrl(profile.serverUrl)
             val updated = profile.copy(
-                epgUrl = profile.epgUrl.ifBlank { stats.epgUrlHeader.orEmpty() },
+                epgUrl = profile.epgUrl.ifBlank { stats.epgUrlHeader.orEmpty() }.ifBlank { derivedEpg },
                 lastSyncAt = System.currentTimeMillis(),
                 totalChannels = stats.totalChannels,
                 totalMovies = stats.totalMovies,
@@ -399,6 +403,19 @@ class IptvRepository(context: Context) {
             profileDao.update(updated)
             updated
         }
+
+    private fun deriveXmltvFromM3uUrl(m3uUrl: String): String {
+        val parsed = m3uUrl.trim().toHttpUrlOrNull() ?: return ""
+        val user = parsed.queryParameter("username") ?: return ""
+        val pass = parsed.queryParameter("password") ?: return ""
+        return parsed.newBuilder()
+            .encodedPath("/xmltv.php")
+            .query(null)
+            .addQueryParameter("username", user)
+            .addQueryParameter("password", pass)
+            .build()
+            .toString()
+    }
 
     suspend fun syncEpgForProfile(profile: ProfileEntity): Int = withContext(Dispatchers.IO) {
         if (profile.epgUrl.isBlank()) return@withContext 0
