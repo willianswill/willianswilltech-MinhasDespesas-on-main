@@ -36,6 +36,7 @@ import com.willianswill.novatv.feature.vod.VodCatalogActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -221,7 +222,7 @@ class HomeActivity : AppCompatActivity() {
         }
 
         binding.btnPlaylists.setOnClickListener {
-            startActivity(Intent(this, PlaylistsActivity::class.java))
+            openServerSwitcherOrPlaylists()
         }
         binding.btnAddFirstPlaylist.setOnClickListener {
             startActivity(Intent(this, PlaylistsActivity::class.java))
@@ -259,6 +260,43 @@ class HomeActivity : AppCompatActivity() {
                     }
                 )
             }
+        }
+    }
+
+    private fun openServerSwitcherOrPlaylists() {
+        lifecycleScope.launch {
+            val profiles = repository.observeProfiles().firstOrNull().orEmpty()
+            if (profiles.size <= 1) {
+                startActivity(Intent(this@HomeActivity, PlaylistsActivity::class.java))
+                return@launch
+            }
+            val labels = profiles.map { p ->
+                val mark = if (p.isActive) "✓ [ATIVO] " else ""
+                "$mark${p.name} (${p.totalChannels} canais)"
+            }.toTypedArray()
+            val activeIdx = profiles.indexOfFirst { it.isActive }.coerceAtLeast(0)
+
+            AlertDialog.Builder(this@HomeActivity)
+                .setTitle("Trocar Servidor / Playlist")
+                .setSingleChoiceItems(labels, activeIdx) { dialog, which ->
+                    val chosen = profiles[which]
+                    dialog.dismiss()
+                    if (!chosen.isActive) {
+                        lifecycleScope.launch {
+                            repository.setActiveProfile(chosen.id)
+                            Toast.makeText(
+                                this@HomeActivity,
+                                "Servidor alterado para: ${chosen.name}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+                .setPositiveButton("➕ Adicionar / Gerenciar") { _, _ ->
+                    startActivity(Intent(this@HomeActivity, PlaylistsActivity::class.java))
+                }
+                .setNegativeButton("Fechar", null)
+                .show()
         }
     }
 

@@ -41,6 +41,35 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Saved Profiles List (Top for quick server switching) -->
+        <TextView
+            android:id="@+id/tv_saved_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Servidores / Playlists Salvas (clique para trocar)"
+            android:textColor="@color/accent_cyan"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_profiles"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="18dp"
+            android:nestedScrollingEnabled="false"
+            android:visibility="gone" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="➕ Adicionar Novo Servidor / Lista"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
         <!-- Protocol Selector Tabs -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -260,23 +289,6 @@
                     android:textSize="13sp" />
             </LinearLayout>
         </LinearLayout>
-
-        <!-- Saved Profiles List -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="22dp"
-            android:layout_marginBottom="10dp"
-            android:text="Perfis Salvos"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_profiles"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:nestedScrollingEnabled="false" />
 
     </LinearLayout>
 </ScrollView>

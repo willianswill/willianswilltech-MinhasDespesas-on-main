@@ -82,10 +82,17 @@ class PlaylistsActivity : AppCompatActivity() {
                 syncProfile(profile)
             },
             onDelete = { profile ->
-                lifecycleScope.launch {
-                    repository.deleteProfile(profile.id)
-                    Toast.makeText(this@PlaylistsActivity, "Perfil removido.", Toast.LENGTH_SHORT).show()
-                }
+                androidx.appcompat.app.AlertDialog.Builder(this@PlaylistsActivity)
+                    .setTitle("Excluir servidor")
+                    .setMessage("Deseja remover a lista \"${profile.name}\"?")
+                    .setPositiveButton("Excluir") { _, _ ->
+                        lifecycleScope.launch {
+                            repository.deleteProfile(profile.id)
+                            Toast.makeText(this@PlaylistsActivity, "Servidor removido.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
             }
         )
         binding.rvProfiles.layoutManager = LinearLayoutManager(this)
@@ -160,6 +167,14 @@ class PlaylistsActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repository.observeProfiles().collectLatest { list ->
                 adapter.submitList(list)
+                val hasSaved = list.isNotEmpty()
+                binding.tvSavedHeader.visibility = if (hasSaved) View.VISIBLE else View.GONE
+                binding.rvProfiles.visibility = if (hasSaved) View.VISIBLE else View.GONE
+                if (hasSaved) {
+                    binding.rvProfiles.post {
+                        binding.rvProfiles.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                    }
+                }
             }
         }
     }
