@@ -19,8 +19,19 @@ android {
         multiDexEnabled = true
     }
 
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("wtv-signing.p12")
+            storeType = "PKCS12"
+            storePassword = "wtv_canais_online_key"
+            keyAlias = "wtv"
+            keyPassword = "wtv_canais_online_key"
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -29,6 +40,7 @@ android {
             )
         }
         debug {
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
         }
     }
