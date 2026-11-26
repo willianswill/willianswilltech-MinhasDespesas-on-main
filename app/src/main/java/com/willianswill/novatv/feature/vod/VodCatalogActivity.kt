@@ -5,10 +5,12 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.paging.LoadState
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -116,10 +118,40 @@ class VodCatalogActivity : AppCompatActivity() {
         val span = if (isLandscape) 5 else 2
         binding.rvVodGrid.layoutManager = GridLayoutManager(this, span)
         binding.rvVodGrid.adapter = if (mode == MediaType.SERIES) seriesAdapter else vodAdapter
+
+        val updateEmptyState: (Int) -> Unit = { count ->
+            binding.emptyVodBox.visibility = if (count == 0) View.VISIBLE else View.GONE
+            binding.rvVodGrid.visibility = if (count == 0) View.GONE else View.VISIBLE
+        }
+        vodAdapter.addLoadStateListener { ls ->
+            if (mode != MediaType.SERIES && ls.refresh is LoadState.NotLoading) {
+                updateEmptyState(vodAdapter.itemCount)
+            }
+        }
+        seriesAdapter.addLoadStateListener { ls ->
+            if (mode == MediaType.SERIES && ls.refresh is LoadState.NotLoading) {
+                updateEmptyState(seriesAdapter.itemCount)
+            }
+        }
     }
 
     private fun setupActions() {
         binding.btnBack.setOnClickListener { finish() }
+        binding.btnVodSync.setOnClickListener {
+            binding.btnVodSync.isEnabled = false
+            binding.btnVodSync.text = "Sincronizando..."
+            lifecycleScope.launch {
+                try {
+                    repository.syncActiveProfile()
+                    Toast.makeText(this@VodCatalogActivity, "Catálogo atualizado!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(this@VodCatalogActivity, "Erro: ${e.message}", Toast.LENGTH_LONG).show()
+                } finally {
+                    binding.btnVodSync.isEnabled = true
+                    binding.btnVodSync.text = "↻ Sincronizar Lista Agora"
+                }
+            }
+        }
         binding.etSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
