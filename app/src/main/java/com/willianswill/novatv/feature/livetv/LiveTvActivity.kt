@@ -22,6 +22,7 @@ import com.willianswill.novatv.core.player.PlayerActivity
 import com.willianswill.novatv.core.player.QualityVariant
 import com.willianswill.novatv.core.ui.NavTab
 import com.willianswill.novatv.core.ui.QuickNavHelper
+import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ActivityLiveTvBinding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -108,6 +109,13 @@ class LiveTvActivity : AppCompatActivity() {
     }
 
     private fun setupActions() {
+        binding.btnBack.enableCinemaFocusZoom(1.05f)
+        binding.btnMultiview.enableCinemaFocusZoom(1.05f)
+        binding.btnFullscreen.enableCinemaFocusZoom(1.05f)
+        binding.rvCategories.post {
+            binding.rvCategories.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
+
         binding.btnBack.setOnClickListener { finish() }
 
         binding.btnFullscreen.setOnClickListener {

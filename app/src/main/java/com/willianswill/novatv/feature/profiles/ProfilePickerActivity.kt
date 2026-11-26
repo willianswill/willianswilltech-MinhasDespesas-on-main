@@ -86,6 +86,9 @@ class ProfilePickerActivity : AppCompatActivity() {
                 enterProfile(user)
             }
         }
+        binding.rvUserProfiles.post {
+            binding.rvUserProfiles.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }
     }
 
     private fun enterProfile(user: UserProfile) {

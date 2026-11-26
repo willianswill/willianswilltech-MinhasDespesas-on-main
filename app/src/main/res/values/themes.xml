@@ -1,7 +1,15 @@
 <resources>
+    <style name="NovaTvButton" parent="Widget.Material3.Button.TextButton">
+        <item name="backgroundTint">@null</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+    </style>
+
     <style name="Theme.NovaTV" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/accent_primary</item>
         <item name="colorSecondary">@color/accent_cyan</item>
+        <item name="materialButtonStyle">@style/NovaTvButton</item>
         <item name="android:windowBackground">@color/bg_cinema</item>
         <item name="android:statusBarColor">@color/bg_cinema</item>
         <item name="android:navigationBarColor">@color/bg_cinema</item>

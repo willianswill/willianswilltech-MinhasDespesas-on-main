@@ -12,6 +12,7 @@ import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.ProfileEntity
 import com.willianswill.novatv.core.database.entity.ProfileType
 import com.willianswill.novatv.core.network.StalkerClient
+import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ActivityPlaylistsBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
@@ -92,6 +93,12 @@ class PlaylistsActivity : AppCompatActivity() {
     }
 
     private fun setupActions() {
+        listOf(
+            binding.btnBack, binding.tabXtream, binding.tabM3u,
+            binding.tabStalker, binding.btnConnectSave, binding.btnPickLocalM3u
+        ).forEach { it.enableCinemaFocusZoom(1.05f) }
+        binding.tabXtream.post { binding.tabXtream.requestFocus() }
+
         binding.btnBack.setOnClickListener { finish() }
         binding.btnPickLocalM3u.setOnClickListener { pickM3uLauncher.launch(arrayOf("*/*")) }
 

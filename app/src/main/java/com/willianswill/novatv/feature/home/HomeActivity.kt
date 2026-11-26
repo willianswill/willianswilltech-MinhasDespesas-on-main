@@ -188,6 +188,10 @@ class HomeActivity : AppCompatActivity() {
         binding.cardMovies.enableCinemaFocusZoom(1.05f)
         binding.cardSeries.enableCinemaFocusZoom(1.05f)
         binding.cardMultiview.enableCinemaFocusZoom(1.05f)
+        binding.btnSwitchProfile.enableCinemaFocusZoom(1.06f)
+        binding.btnPlaylists.enableCinemaFocusZoom(1.06f)
+        binding.btnSettings.enableCinemaFocusZoom(1.06f)
+        binding.btnAddFirstPlaylist.enableCinemaFocusZoom(1.05f)
         binding.btnBannerPrev.enableCinemaFocusZoom(1.06f)
         binding.btnBannerNext.enableCinemaFocusZoom(1.06f)
 
@@ -259,6 +263,7 @@ class HomeActivity : AppCompatActivity() {
                     binding.tvActiveProfile.text = "Nenhum servidor conectado"
                     binding.bannerNoProfile.visibility = View.VISIBLE
                     binding.heroCarouselContainer.visibility = View.GONE
+                    binding.btnAddFirstPlaylist.post { binding.btnAddFirstPlaylist.requestFocus() }
                     toggleSection(binding.tvSectionRecentChannels, binding.rvRecentChannels, false)
                     toggleSection(binding.tvSectionRecentSeries, binding.rvRecentSeries, false)
                     toggleSection(binding.tvSectionRecentMovies, binding.rvRecentMovies, false)
@@ -270,6 +275,9 @@ class HomeActivity : AppCompatActivity() {
                 binding.bannerNoProfile.visibility = View.GONE
                 binding.tvActiveProfile.text =
                     "${profile.name} • ${profile.totalChannels} canais • ${profile.totalMovies} filmes"
+                if (currentFocus == null) {
+                    binding.cardLiveTv.post { binding.cardLiveTv.requestFocus() }
+                }
 
                 if (!startupSyncTriggered && System.currentTimeMillis() - profile.lastSyncAt > 30L * 60L * 1000L) {
                     startupSyncTriggered = true

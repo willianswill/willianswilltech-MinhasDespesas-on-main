@@ -13,6 +13,7 @@ import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.ProfileEntity
 import com.willianswill.novatv.core.player.AppPreferences
 import com.willianswill.novatv.core.player.BufferProfile
+import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ActivitySettingsBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
@@ -52,6 +53,13 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun setupUi() {
+        listOf(
+            binding.btnBack, binding.btnBufLow, binding.btnBufStd, binding.btnBufHigh,
+            binding.btnSaveUa, binding.btnSetPin, binding.btnToggleAdult,
+            binding.btnExportBackup, binding.btnImportBackup
+        ).forEach { it.enableCinemaFocusZoom(1.04f) }
+        binding.btnBack.post { binding.btnBack.requestFocus() }
+
         updateBufferButtons(prefs.bufferProfile)
         binding.switchReconnect.isChecked = prefs.autoReconnect
         binding.etUserAgent.setText(prefs.customUserAgent)
