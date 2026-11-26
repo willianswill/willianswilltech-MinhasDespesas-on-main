@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.paging.LoadState
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
@@ -46,6 +47,8 @@ class LiveTvActivity : AppCompatActivity() {
     private var searchQuery: String = ""
     private var currentPreviewStream: StreamEntity? = null
     private var pagingJob: Job? = null
+    private var moveFocusToFirstChannel = false
+    private var autoPlayedGloboSp = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,6 +82,7 @@ class LiveTvActivity : AppCompatActivity() {
                     onlyFavorites = false
                 }
             }
+            moveFocusToFirstChannel = true
             loadPagedChannels()
         }
         binding.rvCategories.layoutManager = LinearLayoutManager(
@@ -104,6 +108,15 @@ class LiveTvActivity : AppCompatActivity() {
                 }
             }
         )
+        channelAdapter.addLoadStateListener { loadStates ->
+            if (moveFocusToFirstChannel && loadStates.refresh is LoadState.NotLoading && channelAdapter.itemCount > 0) {
+                moveFocusToFirstChannel = false
+                binding.rvChannels.scrollToPosition(0)
+                binding.rvChannels.post {
+                    binding.rvChannels.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                }
+            }
+        }
         binding.rvChannels.layoutManager = LinearLayoutManager(this)
         binding.rvChannels.adapter = channelAdapter
     }
@@ -165,6 +178,15 @@ class LiveTvActivity : AppCompatActivity() {
                 launch {
                     repository.observeCategories(profile.id, MediaType.LIVE, prefs.showAdultContent).collectLatest { cats ->
                         categoryAdapter.submitCategories(CategoryPrioritySorter.sortLiveCategories(cats))
+                    }
+                }
+                if (!autoPlayedGloboSp) {
+                    autoPlayedGloboSp = true
+                    launch {
+                        val globoSp = repository.findPreferredGloboSp(profile.id)
+                        if (globoSp != null && currentPreviewStream == null) {
+                            previewChannel(globoSp)
+                        }
                     }
                 }
                 loadPagedChannels()

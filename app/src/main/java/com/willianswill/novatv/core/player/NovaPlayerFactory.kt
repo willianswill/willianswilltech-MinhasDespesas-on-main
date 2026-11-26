@@ -40,7 +40,7 @@ object NovaPlayerFactory {
                 effectiveProfile.bufferForPlaybackMs,
                 effectiveProfile.bufferForPlaybackAfterRebufferMs
             )
-            .setBackBuffer(if (forMultiView) 0 else 5_000, !forMultiView)
+            .setBackBuffer(if (forMultiView) 0 else 30_000, !forMultiView)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 

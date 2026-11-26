@@ -182,6 +182,11 @@ class IptvRepository(context: Context) {
             streamDao.getM3uSeriesEpisodes(profileId, seriesId)
         }
 
+    suspend fun findPreferredGloboSp(profileId: Long): StreamEntity? =
+        withContext(Dispatchers.IO) {
+            streamDao.findPreferredGloboSp(profileId)
+        }
+
     suspend fun syncActiveProfile(): ProfileEntity? = withContext(Dispatchers.IO) {
         val profile = profileDao.getActiveProfile() ?: return@withContext null
         when (profile.type) {

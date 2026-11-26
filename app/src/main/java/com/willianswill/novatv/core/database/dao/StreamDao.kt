@@ -108,6 +108,29 @@ interface StreamDao {
     @Query("SELECT COUNT(*) FROM streams WHERE profileId = :profileId AND mediaType = :mediaType")
     suspend fun countByType(profileId: Long, mediaType: String): Int
 
+    @Query(
+        """
+        SELECT * FROM streams
+        WHERE profileId = :profileId AND mediaType = 'LIVE'
+          AND (UPPER(baseName) LIKE '%GLOBO%' OR UPPER(name) LIKE '%GLOBO%')
+        ORDER BY
+          CASE
+            WHEN baseName LIKE '%São Paulo%'
+              OR baseName LIKE '%SÃO PAULO%'
+              OR UPPER(baseName) LIKE '%SAO PAULO%'
+              OR UPPER(baseName) LIKE '% SP%'
+              OR UPPER(baseName) LIKE '%-SP%'
+              OR UPPER(baseName) LIKE '%(SP)%'
+            THEN 0
+            ELSE 1
+          END ASC,
+          qualityRank DESC,
+          id ASC
+        LIMIT 1
+        """
+    )
+    suspend fun findPreferredGloboSp(profileId: Long): StreamEntity?
+
     @Query("DELETE FROM streams WHERE profileId = :profileId")
     suspend fun deleteByProfile(profileId: Long)
 }

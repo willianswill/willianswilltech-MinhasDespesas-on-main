@@ -81,6 +81,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
     private val hideGestureRunnable = Runnable { binding.tvGestureFeedback.visibility = View.GONE }
     private var pendingSeekTargetMs = -1L
     private var progressiveSeekDeltaMs = 0L
+    private var seekLockUntilMs = 0L
     private var saveTickCount = 0
     private var heartbeatTickCount = 0
     private val autoNextRunnable = Runnable {
@@ -196,6 +197,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
                 val isRight = e.x > width / 2f
                 val delta = if (isRight) 10_000L else -10_000L
                 val target = (exo.currentPosition + delta).coerceIn(0L, exo.duration.coerceAtLeast(0L))
+                seekLockUntilMs = System.currentTimeMillis() + 1800L
                 exo.seekTo(target)
                 updateSeekUiImmediate(target, exo.duration)
                 showControls(focusSeekBar = true)
@@ -361,7 +363,9 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
 
             override fun onStopTrackingTouch(seekBar: SeekBar?) {
                 isSeeking = false
-                player?.seekTo((seekBar?.progress ?: 0).toLong())
+                val target = (seekBar?.progress ?: 0).toLong()
+                seekLockUntilMs = System.currentTimeMillis() + 1800L
+                player?.seekTo(target)
                 scheduleHideControls()
             }
         })
@@ -437,6 +441,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
                     }
                     Player.STATE_READY -> {
                         retryCount = 0
+                        seekLockUntilMs = 0L
                         lastReadyAtMs = System.currentTimeMillis()
                         hideLoading()
                         binding.btnPlayPause.text = if (exo.isPlaying) "⏸ Pausar" else "▶ Retomar"
@@ -711,6 +716,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         val exo = player ?: return
         if (!isVodPlayback() || exo.duration <= 0L) return
         val target = (exo.currentPosition + deltaMs).coerceIn(0L, exo.duration)
+        seekLockUntilMs = System.currentTimeMillis() + 1800L
         exo.seekTo(target)
         updateSeekUiImmediate(target, exo.duration)
         val sec = (deltaMs / 1000L)
@@ -854,7 +860,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
                 sendPlaybackHeartbeat(currentItem)
             }
         }
-        if (!isSeeking && pendingSeekTargetMs < 0L && exo.duration > 0) {
+        if (!isSeeking && pendingSeekTargetMs < 0L && System.currentTimeMillis() > seekLockUntilMs && exo.duration > 0) {
             val pos = exo.currentPosition
             val dur = exo.duration
             val remaining = (dur - pos).coerceAtLeast(0L)
@@ -1083,6 +1089,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         if ((keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) &&
             pendingSeekTargetMs >= 0L
         ) {
+            seekLockUntilMs = System.currentTimeMillis() + 1800L
             player?.seekTo(pendingSeekTargetMs)
             pendingSeekTargetMs = -1L
             progressiveSeekDeltaMs = 0L
