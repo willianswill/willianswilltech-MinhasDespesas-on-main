@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.room.withTransaction
 import com.willianswill.novatv.core.database.entity.CategoryEntity
 import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.ProfileEntity
@@ -16,10 +17,13 @@ import com.willianswill.novatv.core.parser.ChannelQualityParser
 import com.willianswill.novatv.core.parser.StreamingM3uParser
 import com.willianswill.novatv.core.player.UserProfileManager
 import com.willianswill.novatv.core.parser.StreamingXmltvParser
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -37,6 +41,10 @@ class IptvRepository(context: Context) {
     private val epgDao = db.epgDao()
     private val historyDao = db.watchHistoryDao()
     private val xtreamClient = XtreamApiClient()
+
+    companion object {
+        private val bgSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
 
     private val adultKeywords = listOf("adult", "xxx", "+18", "18+", "porn", "erotic")
 
@@ -189,6 +197,207 @@ class IptvRepository(context: Context) {
         withContext(Dispatchers.IO) {
             streamDao.findPreferredGloboSp(profileId)
         }
+
+    suspend fun syncActiveLiveFirst(): ProfileEntity? = withContext(Dispatchers.IO) {
+        val profile = profileDao.getActiveProfile() ?: return@withContext null
+        when (profile.type) {
+            ProfileType.XTREAM.name -> {
+                val ua = profile.userAgent.takeIf { it.isNotBlank() }
+                val auth = xtreamClient.authenticate(profile.serverUrl, profile.username, profile.password, ua)
+                val status = auth.userInfo?.status.orEmpty()
+                if (status.isNotEmpty() && !status.equals("Active", ignoreCase = true)) {
+                    throw IllegalStateException("Conta Xtream com status: $status")
+                }
+
+                val favStreamUrls = streamDao.getFavoriteUrls(profile.id).toHashSet()
+                val (liveCats, liveDtos) = coroutineScope {
+                    val catsJob = async {
+                        runCatching { xtreamClient.getLiveCategories(profile.serverUrl, profile.username, profile.password, ua) }
+                            .getOrDefault(emptyList())
+                    }
+                    val streamsJob = async {
+                        runCatching { xtreamClient.getLiveStreams(profile.serverUrl, profile.username, profile.password, ua) }
+                            .getOrDefault(emptyList())
+                    }
+                    catsJob.await() to streamsJob.await()
+                }
+
+                val catNameMap = HashMap<String, String>()
+                val categoryEntities = liveCats.mapIndexed { idx, c ->
+                    catNameMap[c.categoryId] = c.categoryName
+                    CategoryEntity(
+                        profileId = profile.id,
+                        categoryId = c.categoryId,
+                        name = c.categoryName,
+                        mediaType = MediaType.LIVE,
+                        isAdult = isAdult(c.categoryName),
+                        sortOrder = idx
+                    )
+                }
+
+                val liveEntities = liveDtos.map { dto ->
+                    val url = xtreamClient.buildLiveUrl(profile.serverUrl, profile.username, profile.password, dto.streamId, "ts")
+                    val catId = dto.categoryId.orEmpty()
+                    val catName = catNameMap[catId] ?: "Ao Vivo"
+                    val parsedQ = ChannelQualityParser.parse(dto.name)
+                    StreamEntity(
+                        profileId = profile.id,
+                        streamId = dto.streamId.toString(),
+                        mediaType = MediaType.LIVE,
+                        name = dto.name,
+                        baseName = parsedQ.baseName,
+                        qualityLabel = parsedQ.qualityLabel,
+                        qualityRank = parsedQ.qualityRank,
+                        streamUrl = url,
+                        iconUrl = dto.streamIcon.orEmpty(),
+                        categoryId = catId,
+                        categoryName = catName,
+                        epgChannelId = dto.epgChannelId.orEmpty(),
+                        hasCatchup = dto.tvArchive == 1,
+                        catchupDays = dto.tvArchiveDuration,
+                        userAgent = ua,
+                        isFavorite = favStreamUrls.contains(url),
+                        isAdult = isAdult(catName) || isAdult(dto.name),
+                        addedAt = dto.added?.toLongOrNull() ?: 0L
+                    )
+                }
+
+                db.withTransaction {
+                    categoryDao.deleteByProfile(profile.id)
+                    streamDao.deleteByProfile(profile.id)
+                    seriesDao.deleteByProfile(profile.id)
+                    categoryEntities.chunked(1000).forEach { categoryDao.insertAll(it) }
+                    liveEntities.chunked(1500).forEach { streamDao.insertAll(it) }
+                }
+
+                val epgUrl = profile.epgUrl.ifBlank {
+                    xtreamClient.buildXmltvEpgUrl(profile.serverUrl, profile.username, profile.password)
+                }
+                val updated = profile.copy(
+                    epgUrl = epgUrl,
+                    lastSyncAt = System.currentTimeMillis(),
+                    totalChannels = liveDtos.size
+                )
+                profileDao.update(updated)
+
+                bgSyncScope.launch {
+                    runCatching { syncRemainingVodSeriesAndEpg(updated) }
+                }
+                updated
+            }
+            ProfileType.M3U_URL.name -> {
+                val synced = xtreamClient.openStream(profile.serverUrl, profile.userAgent).use { stream ->
+                    syncM3uStream(profile, stream)
+                }
+                if (synced.epgUrl.isNotBlank()) {
+                    bgSyncScope.launch { runCatching { syncEpgForProfile(synced) } }
+                }
+                synced
+            }
+            else -> profile
+        }
+    }
+
+    private suspend fun syncRemainingVodSeriesAndEpg(profile: ProfileEntity) = withContext(Dispatchers.IO) {
+        val ua = profile.userAgent.takeIf { it.isNotBlank() }
+        val favStreamUrls = streamDao.getFavoriteUrls(profile.id).toHashSet()
+        val favSeriesIds = seriesDao.getFavoriteSeriesIds(profile.id).toHashSet()
+
+        val (vodCats, seriesCats, vodDtos, seriesDtos) = coroutineScope {
+            val vc = async { runCatching { xtreamClient.getVodCategories(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            val sc = async { runCatching { xtreamClient.getSeriesCategories(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            val vs = async { runCatching { xtreamClient.getVodStreams(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            val ss = async { runCatching { xtreamClient.getSeries(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            listOf(vc.await(), sc.await(), vs.await(), ss.await())
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        val vCats = vodCats as List<com.willianswill.novatv.core.network.XtreamCategoryDto>
+        @Suppress("UNCHECKED_CAST")
+        val sCats = seriesCats as List<com.willianswill.novatv.core.network.XtreamCategoryDto>
+        @Suppress("UNCHECKED_CAST")
+        val vDtos = vodDtos as List<com.willianswill.novatv.core.network.XtreamVodStreamDto>
+        @Suppress("UNCHECKED_CAST")
+        val sDtos = seriesDtos as List<com.willianswill.novatv.core.network.XtreamSeriesDto>
+
+        val vodCatMap = HashMap<String, String>()
+        val seriesCatMap = HashMap<String, String>()
+        val extraCats = ArrayList<CategoryEntity>(vCats.size + sCats.size)
+        vCats.forEachIndexed { idx, c ->
+            vodCatMap[c.categoryId] = c.categoryName
+            extraCats.add(CategoryEntity(profileId = profile.id, categoryId = c.categoryId, name = c.categoryName, mediaType = MediaType.MOVIE, isAdult = isAdult(c.categoryName), sortOrder = idx))
+        }
+        sCats.forEachIndexed { idx, c ->
+            seriesCatMap[c.categoryId] = c.categoryName
+            extraCats.add(CategoryEntity(profileId = profile.id, categoryId = c.categoryId, name = c.categoryName, mediaType = MediaType.SERIES, isAdult = isAdult(c.categoryName), sortOrder = idx))
+        }
+
+        val vodEntities = vDtos.map { dto ->
+            val ext = dto.containerExtension.orEmpty().ifBlank { "mp4" }
+            val url = xtreamClient.buildMovieUrl(profile.serverUrl, profile.username, profile.password, dto.streamId, ext)
+            val catId = dto.categoryId.orEmpty()
+            val catName = vodCatMap[catId] ?: "Filmes"
+            val ratingStr = (dto.rating as? JsonPrimitive)?.contentOrNull.orEmpty()
+            StreamEntity(
+                profileId = profile.id,
+                streamId = dto.streamId.toString(),
+                mediaType = MediaType.MOVIE,
+                name = dto.name,
+                streamUrl = url,
+                iconUrl = dto.streamIcon.orEmpty(),
+                categoryId = catId,
+                categoryName = catName,
+                containerExtension = ext,
+                rating = ratingStr,
+                userAgent = ua,
+                isFavorite = favStreamUrls.contains(url),
+                isAdult = isAdult(catName) || isAdult(dto.name),
+                addedAt = dto.added?.toLongOrNull() ?: 0L
+            )
+        }
+
+        val seriesEntities = sDtos.map { dto ->
+            val sid = dto.seriesId?.content.orEmpty().ifBlank { dto.name.hashCode().toString() }
+            val catId = dto.categoryId.orEmpty()
+            val catName = seriesCatMap[catId] ?: "Séries"
+            val ratingStr = (dto.rating as? JsonPrimitive)?.contentOrNull.orEmpty()
+            SeriesEntity(
+                profileId = profile.id,
+                seriesId = sid,
+                name = dto.name,
+                coverUrl = dto.cover.orEmpty(),
+                categoryId = catId,
+                categoryName = catName,
+                plot = dto.plot.orEmpty(),
+                cast = dto.cast.orEmpty(),
+                director = dto.director.orEmpty(),
+                genre = dto.genre.orEmpty(),
+                releaseDate = dto.releaseDate.orEmpty(),
+                rating = ratingStr,
+                isFavorite = favSeriesIds.contains(sid),
+                isAdult = isAdult(catName) || isAdult(dto.name),
+                lastModified = dto.lastModified?.toLongOrNull() ?: 0L
+            )
+        }
+
+        db.withTransaction {
+            extraCats.chunked(1000).forEach { categoryDao.insertAll(it) }
+            vodEntities.chunked(1500).forEach { streamDao.insertAll(it) }
+            seriesEntities.chunked(1500).forEach { seriesDao.insertAll(it) }
+        }
+
+        val latest = profileDao.getActiveProfile() ?: profile
+        val updated = latest.copy(
+            totalMovies = vDtos.size,
+            totalSeries = sDtos.size,
+            lastSyncAt = System.currentTimeMillis()
+        )
+        profileDao.update(updated)
+
+        if (updated.epgUrl.isNotBlank()) {
+            runCatching { syncEpgForProfile(updated) }
+        }
+    }
 
     suspend fun syncActiveProfile(): ProfileEntity? = withContext(Dispatchers.IO) {
         val profile = profileDao.getActiveProfile() ?: return@withContext null

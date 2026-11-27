@@ -181,18 +181,16 @@ class PlaylistsActivity : AppCompatActivity() {
     }
 
     private fun createAndSync(profile: ProfileEntity) {
-        setBusy(true, "Conectando e baixando catálogo...")
+        setBusy(true, "Conectando e carregando canais ao vivo...")
         lifecycleScope.launch {
             try {
                 val id = repository.saveProfile(profile, activate = true)
                 val saved = profile.copy(id = id, isActive = true)
-                val synced = repository.syncActiveProfile() ?: saved
-                setBusy(true, "Sincronizando EPG (Guia de Programação)...")
-                val epgCount = runCatching { repository.syncEpgForProfile(synced) }.getOrDefault(0)
+                val synced = repository.syncActiveLiveFirst() ?: saved
                 setBusy(false)
                 Toast.makeText(
                     this@PlaylistsActivity,
-                    "Sincronizado: ${synced.totalChannels} canais, ${synced.totalMovies} filmes, $epgCount programas EPG!",
+                    "Canais prontos (${synced.totalChannels} canais)! Filmes, séries e EPG carregando em segundo plano.",
                     Toast.LENGTH_LONG
                 ).show()
                 finish()

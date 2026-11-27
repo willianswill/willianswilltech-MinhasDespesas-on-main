@@ -375,7 +375,7 @@ class HomeActivity : AppCompatActivity() {
                         password = xtreamPass
                     )
                     savedId = repository.saveProfile(xtreamProfile, activate = true)
-                    synced = runCatching { repository.syncActiveProfile() }.getOrNull()
+                    synced = runCatching { repository.syncActiveLiveFirst() }.getOrNull()
                     if (synced == null || (synced.totalChannels == 0 && synced.totalMovies == 0 && synced.totalSeries == 0)) {
                         repository.deleteProfile(savedId)
                         savedId = 0L
@@ -391,20 +391,17 @@ class HomeActivity : AppCompatActivity() {
                     )
                     savedId = repository.saveProfile(m3uProfile, activate = true)
                     try {
-                        synced = repository.syncActiveProfile()
+                        synced = repository.syncActiveLiveFirst()
                     } catch (syncErr: Exception) {
                         repository.deleteProfile(savedId)
                         throw syncErr
                     }
                 }
 
-                if (synced != null && synced.epgUrl.isNotBlank()) {
-                    runCatching { repository.syncEpgForProfile(synced) }
-                }
                 TelemetryManager.markMacPlaylistApplied(this@HomeActivity, remote.updatedAt)
                 Toast.makeText(
                     this@HomeActivity,
-                    "Lista ${remote.name} pronta (${synced?.totalChannels ?: 0} canais, ${synced?.totalMovies ?: 0} filmes)!",
+                    "Lista ${remote.name} pronta (${synced?.totalChannels ?: 0} canais)! Filmes e EPG em segundo plano.",
                     Toast.LENGTH_LONG
                 ).show()
             } catch (e: Exception) {
