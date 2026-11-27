@@ -1,8 +1,16 @@
 package com.willianswill.novatv.core.downloads
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.willianswill.novatv.R
 import com.willianswill.novatv.core.network.HttpClientProvider
 import okhttp3.Request
 import java.io.File
@@ -86,6 +94,7 @@ class VodDownloadWorker(
                         errorMessage = ""
                     )
                 }
+                showCompletedNotification(item.title, id.hashCode())
             }
             Result.success()
         } catch (e: Exception) {
@@ -97,6 +106,29 @@ class VodDownloadWorker(
                 )
             }
             Result.failure()
+        }
+    }
+
+    private fun showCompletedNotification(title: String, notifId: Int) {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+            val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            val channelId = "novatv_downloads"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val ch = NotificationChannel(channelId, "Downloads Offline", NotificationManager.IMPORTANCE_DEFAULT)
+                nm.createNotificationChannel(ch)
+            }
+            val notif = NotificationCompat.Builder(applicationContext, channelId)
+                .setSmallIcon(R.drawable.ic_wtv_launcher)
+                .setContentTitle("✓ Download concluído")
+                .setContentText("$title está pronto na aba ⬇ Offline")
+                .setAutoCancel(true)
+                .build()
+            nm.notify(notifId, notif)
         }
     }
 }

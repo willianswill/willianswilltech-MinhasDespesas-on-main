@@ -103,6 +103,8 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
             switchToIndex(currentIndex + 1)
         }
     }
+    private val numericZapBuffer = StringBuilder()
+    private val commitNumericZapRunnable = Runnable { commitNumericZap() }
 
     private val resizeModes = listOf(
         AspectRatioFrameLayout.RESIZE_MODE_FIT to "Ajustar",
@@ -449,6 +451,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
 
         binding.tvTitle.text = item.title
         binding.tvSubtitle.text = item.subtitle
+        binding.tvTechBadge.visibility = View.GONE
         binding.btnCatchup.visibility = if (item.hasCatchup) View.VISIBLE else View.GONE
 
         val isVod = item.mediaType != MediaType.LIVE || overrideCatchupUrl != null
@@ -492,6 +495,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
                         seekLockUntilMs = 0L
                         lastReadyAtMs = System.currentTimeMillis()
                         hideLoading()
+                        updateTechBadge()
                         binding.btnPlayPause.text = if (exo.isPlaying) "⏸ Pausar" else "▶ Retomar"
                         if (isVod && exo.duration > 0) {
                             binding.seekBar.max = exo.duration.toInt()
@@ -906,6 +910,64 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         }
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun updateTechBadge() {
+        val exo = player ?: return
+        val fmt = exo.videoFormat
+        val parts = mutableListOf<String>()
+        if (fmt != null && fmt.height > 0) {
+            val resLabel = when {
+                fmt.height >= 2000 -> "4K"
+                fmt.height >= 1000 -> "1080p"
+                fmt.height >= 700 -> "720p"
+                else -> "${fmt.height}p"
+            }
+            parts.add(resLabel)
+            if (fmt.frameRate > 0f) {
+                parts.add("${fmt.frameRate.toInt()}fps")
+            }
+            val mime = fmt.sampleMimeType.orEmpty().lowercase()
+            val codec = when {
+                mime.contains("hevc") || mime.contains("h265") -> "HEVC"
+                mime.contains("avc") || mime.contains("h264") -> "H264"
+                mime.contains("av01") -> "AV1"
+                else -> ""
+            }
+            if (codec.isNotEmpty()) parts.add(codec)
+        }
+        val mbps = getEstimatedSpeedMbps()
+        if (mbps > 0.0) {
+            parts.add(String.format(Locale.getDefault(), "%.1f Mbps", mbps))
+        }
+        if (parts.isNotEmpty()) {
+            binding.tvTechBadge.text = parts.joinToString(" • ")
+            binding.tvTechBadge.visibility = View.VISIBLE
+        }
+    }
+
+    private fun handleNumericDigit(digit: Int) {
+        if (items.isEmpty()) return
+        if (numericZapBuffer.length >= 4) numericZapBuffer.clear()
+        numericZapBuffer.append(digit)
+        binding.tvChannelNumberOsd.text = "📺 ${numericZapBuffer}"
+        binding.tvChannelNumberOsd.visibility = View.VISIBLE
+        handler.removeCallbacks(commitNumericZapRunnable)
+        handler.postDelayed(commitNumericZapRunnable, 1200L)
+    }
+
+    private fun commitNumericZap() {
+        val raw = numericZapBuffer.toString()
+        numericZapBuffer.clear()
+        binding.tvChannelNumberOsd.visibility = View.GONE
+        val chNum = raw.toIntOrNull() ?: return
+        val targetIdx = chNum - 1
+        if (targetIdx in items.indices) {
+            switchToIndex(targetIdx)
+        } else {
+            Toast.makeText(this, "Canal $chNum não encontrado (1 a ${items.size}).", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun sendPlaybackHeartbeat(item: PlayableItem) {
         val statusLabel = when (item.mediaType) {
             MediaType.MOVIE -> "Assistindo Filme"
@@ -943,6 +1005,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
             binding.tvPosTime.text = formatDuration(pos)
             binding.tvDurTime.text = "-${formatDuration(remaining)}"
             binding.tvBufferPercent.text = "Buffer: ${exo.bufferedPercentage}%"
+            updateTechBadge()
 
             val item = items.getOrNull(currentIndex)
             if (item != null && item.mediaType != MediaType.LIVE && exo.isPlaying) {
@@ -953,10 +1016,16 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
             }
             if (item?.mediaType == MediaType.SERIES && currentIndex + 1 < items.size) {
                 if (remaining in 1L..30_000L) {
-                    binding.btnNextEpisode.text = "▶ Próximo Episódio (${remaining / 1000L}s)"
+                    val wasHidden = binding.btnNextEpisode.visibility != View.VISIBLE
+                    binding.btnNextEpisode.text = "▶ Próximo Episódio (${(remaining / 1000L).coerceAtLeast(1L)}s)"
                     binding.btnNextEpisode.visibility = View.VISIBLE
+                    if (wasHidden && binding.controlsOverlay.visibility != View.VISIBLE) {
+                        binding.btnNextEpisode.requestFocus()
+                    }
                 }
             }
+        } else if (!isVodPlayback()) {
+            updateTechBadge()
         }
     }
 
@@ -1182,6 +1251,18 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
             }
             KeyEvent.KEYCODE_CHANNEL_UP -> { zap(1); true }
             KeyEvent.KEYCODE_CHANNEL_DOWN -> { zap(-1); true }
+            in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> {
+                if (!vod) {
+                    handleNumericDigit(keyCode - KeyEvent.KEYCODE_0)
+                    true
+                } else super.onKeyDown(keyCode, event)
+            }
+            in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> {
+                if (!vod) {
+                    handleNumericDigit(keyCode - KeyEvent.KEYCODE_NUMPAD_0)
+                    true
+                } else super.onKeyDown(keyCode, event)
+            }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 if (binding.vodQuickPanel.visibility != View.VISIBLE &&
                     binding.channelDrawer.visibility != View.VISIBLE &&
