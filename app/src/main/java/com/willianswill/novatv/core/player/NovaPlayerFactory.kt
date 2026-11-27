@@ -7,6 +7,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -52,9 +53,10 @@ object NovaPlayerFactory {
             ?: AppPreferences(context).customUserAgent
         referrer?.takeIf { it.isNotBlank() }?.let { headers["Referer"] = it }
 
-        val dataSourceFactory = OkHttpDataSource.Factory(HttpClientProvider.playerClient)
+        val httpDataSourceFactory = OkHttpDataSource.Factory(HttpClientProvider.playerClient)
             .setUserAgent(ua)
             .setDefaultRequestProperties(headers)
+        val dataSourceFactory = DefaultDataSource.Factory(context.applicationContext, httpDataSourceFactory)
 
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
