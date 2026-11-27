@@ -367,10 +367,32 @@
           return;
         }
 
+        const fallbackWatchTimers = window._fallbackWatchTimers || (window._fallbackWatchTimers = {});
+
+        function formatElapsed(ms) {
+          const totalSec = Math.max(0, Math.floor(ms / 1000));
+          const h = Math.floor(totalSec / 3600);
+          const m = Math.floor((totalSec % 3600) / 60);
+          const s = totalSec % 60;
+          if (h > 0) return `${h}h ${m}m ${s}s`;
+          if (m > 0) return `${m}m ${s}s`;
+          return `${s}s`;
+        }
+
         listEl.innerHTML = active.map(s => {
           const icon = s.deviceType === 'TV Box' ? '📺' : '📱';
           const ago = Math.max(0, Math.floor((now - s.lastSeenAt) / 1000));
-          const watch = s.watchingTitle ? `▶ ${s.status}: ${s.watchingTitle}` : `🏠 ${s.status}`;
+          const watchKey = `${s.status || ''}|${s.watchingTitle || ''}`;
+          if (!fallbackWatchTimers[s.deviceId] || fallbackWatchTimers[s.deviceId].key !== watchKey) {
+            fallbackWatchTimers[s.deviceId] = { key: watchKey, since: now };
+          }
+          const sinceMs = (s.watchingSinceAt && s.watchingSinceAt > 0)
+            ? s.watchingSinceAt
+            : fallbackWatchTimers[s.deviceId].since;
+          const elapsedStr = formatElapsed(now - sinceMs);
+          const watch = s.watchingTitle
+            ? `▶ ${s.status}: ${s.watchingTitle} <span style="color:#FBBF24;font-size:12px;">• ⏱ há ${elapsedStr} neste canal</span>`
+            : `🏠 ${s.status} <span style="color:#94A3B8;font-size:12px;">• ⏱ há ${elapsedStr}</span>`;
           const loc = s.location ? `📍 ${s.location}` : '📍 Localização indisponível';
           const cmd = cmdData[s.deviceId] || {};
           const isBlocked = cmd.action === 'BLOCK';

