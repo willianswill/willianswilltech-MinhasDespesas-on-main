@@ -33,6 +33,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
+import com.bumptech.glide.Glide
+import com.willianswill.novatv.R
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.ProfileType
@@ -274,7 +276,8 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
             binding.btnTracks, binding.btnQuality, binding.btnAspect, binding.btnReload,
             binding.btnChannelList, binding.btnRecall, binding.btnNextEpisode,
             binding.btnCatchup, binding.btnMultiview, binding.btnPip,
-            binding.btnQpAudio, binding.btnQpSubtitles, binding.btnQpEpisodes, binding.btnQpClose
+            binding.btnQpAudio, binding.btnQpSubtitles, binding.btnQpEpisodes, binding.btnQpClose,
+            binding.cardRecentLive1, binding.cardRecentLive2
         ).forEach { it.enableCinemaFocusZoom(1.06f) }
 
         binding.btnQpAudio.setOnClickListener {
@@ -986,12 +989,83 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
 
     private fun showControls(focusSeekBar: Boolean = false) {
         binding.controlsOverlay.visibility = View.VISIBLE
-        if (focusSeekBar && isVodPlayback() && binding.seekContainer.visibility == View.VISIBLE) {
-            binding.seekBar.requestFocus()
+        if (!isVodPlayback()) {
+            loadRecentLiveThumbnails()
+            val targetBtn = when {
+                binding.btnQuality.visibility == View.VISIBLE -> binding.btnQuality
+                else -> binding.btnChannelList
+            }
+            targetBtn.requestFocus()
         } else {
-            binding.btnPlayPause.requestFocus()
+            binding.recentLiveStrip.visibility = View.GONE
+            if (focusSeekBar && binding.seekContainer.visibility == View.VISIBLE) {
+                binding.seekBar.requestFocus()
+            } else {
+                binding.btnPlayPause.requestFocus()
+            }
         }
         scheduleHideControls()
+    }
+
+    private fun loadRecentLiveThumbnails() {
+        val current = items.getOrNull(currentIndex) ?: return
+        lifecycleScope.launch {
+            val profile = repository.observeActiveProfile().firstOrNull() ?: run {
+                binding.recentLiveStrip.visibility = View.GONE
+                return@launch
+            }
+            val recent = repository.observeHistoryByType(profile.id, MediaType.LIVE)
+                .firstOrNull()
+                .orEmpty()
+                .filter { it.contentKey != current.contentKey && it.streamUrl != current.streamUrl }
+                .take(2)
+
+            if (recent.isEmpty()) {
+                binding.recentLiveStrip.visibility = View.GONE
+                return@launch
+            }
+            binding.recentLiveStrip.visibility = View.VISIBLE
+            bindRecentLiveCard(recent.getOrNull(0), binding.cardRecentLive1, binding.ivRecentLive1, binding.tvRecentLive1)
+            bindRecentLiveCard(recent.getOrNull(1), binding.cardRecentLive2, binding.ivRecentLive2, binding.tvRecentLive2)
+        }
+    }
+
+    private fun bindRecentLiveCard(
+        entry: WatchHistoryEntity?,
+        card: View,
+        iconView: android.widget.ImageView,
+        titleView: android.widget.TextView
+    ) {
+        if (entry == null) {
+            card.visibility = View.GONE
+            return
+        }
+        card.visibility = View.VISIBLE
+        titleView.text = entry.title
+        if (entry.iconUrl.isNotBlank()) {
+            Glide.with(this).load(entry.iconUrl).placeholder(R.drawable.ic_tv_logo).into(iconView)
+        } else {
+            iconView.setImageResource(R.drawable.ic_tv_logo)
+        }
+        card.setOnClickListener {
+            val idx = items.indexOfFirst { it.streamUrl == entry.streamUrl || it.contentKey == entry.contentKey }
+            if (idx >= 0) {
+                hideControls()
+                switchToIndex(idx)
+            } else {
+                val fallbackItem = PlayableItem(
+                    contentKey = entry.contentKey,
+                    title = entry.title,
+                    subtitle = "Último canal",
+                    streamUrl = entry.streamUrl,
+                    iconUrl = entry.iconUrl,
+                    mediaType = MediaType.LIVE
+                )
+                items = listOf(fallbackItem) + items
+                hideControls()
+                switchToIndex(0)
+            }
+        }
     }
 
     private fun hideControls() {
@@ -1084,7 +1158,11 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
                     binding.channelDrawer.visibility != View.VISIBLE &&
                     (binding.controlsOverlay.visibility != View.VISIBLE || binding.seekBar.hasFocus())
                 ) {
-                    togglePlayPauseAndShowOsd()
+                    if (!vod) {
+                        showControls(focusSeekBar = false)
+                    } else {
+                        togglePlayPauseAndShowOsd()
+                    }
                     true
                 } else {
                     super.onKeyDown(keyCode, event)
