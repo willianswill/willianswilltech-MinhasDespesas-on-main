@@ -274,11 +274,15 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         listOf(
             binding.btnBack, binding.btnPrev, binding.btnPlayPause, binding.btnNext,
             binding.btnTracks, binding.btnQuality, binding.btnAspect, binding.btnReload,
-            binding.btnChannelList, binding.btnRecall, binding.btnNextEpisode,
+            binding.btnChannelList, binding.btnNextEpisode,
             binding.btnCatchup, binding.btnMultiview, binding.btnPip,
             binding.btnQpAudio, binding.btnQpSubtitles, binding.btnQpEpisodes, binding.btnQpClose,
-            binding.cardRecentLive1, binding.cardRecentLive2
-        ).forEach { it.enableCinemaFocusZoom(1.06f) }
+            binding.cardRecentLive1, binding.cardRecentLive2,
+            binding.cardRecentLive3, binding.cardRecentLive4
+        ).forEach {
+            it.backgroundTintList = null
+            it.enableCinemaFocusZoom(1.12f)
+        }
 
         binding.btnQpAudio.setOnClickListener {
             closeQuickPanel()
@@ -297,11 +301,6 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnChannelList.setOnClickListener { openChannelDrawer() }
         binding.btnCloseDrawer.setOnClickListener { closeChannelDrawer() }
-        binding.btnRecall.setOnClickListener {
-            if (previousIndex in items.indices && previousIndex != currentIndex) {
-                switchToIndex(previousIndex)
-            }
-        }
         binding.btnNextEpisode.setOnClickListener {
             if (currentIndex + 1 < items.size) {
                 switchToIndex(currentIndex + 1)
@@ -397,7 +396,6 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         activeVariants = emptyList()
         failedVariantUrls.clear()
         binding.btnNextEpisode.visibility = View.GONE
-        binding.btnRecall.visibility = if (previousIndex in items.indices) View.VISIBLE else View.GONE
         startPlayback(isRetry = false)
     }
 
@@ -1018,7 +1016,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
                 .firstOrNull()
                 .orEmpty()
                 .filter { it.contentKey != current.contentKey && it.streamUrl != current.streamUrl }
-                .take(2)
+                .take(4)
 
             if (recent.isEmpty()) {
                 binding.recentLiveStrip.visibility = View.GONE
@@ -1027,6 +1025,8 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
             binding.recentLiveStrip.visibility = View.VISIBLE
             bindRecentLiveCard(recent.getOrNull(0), binding.cardRecentLive1, binding.ivRecentLive1, binding.tvRecentLive1)
             bindRecentLiveCard(recent.getOrNull(1), binding.cardRecentLive2, binding.ivRecentLive2, binding.tvRecentLive2)
+            bindRecentLiveCard(recent.getOrNull(2), binding.cardRecentLive3, binding.ivRecentLive3, binding.tvRecentLive3)
+            bindRecentLiveCard(recent.getOrNull(3), binding.cardRecentLive4, binding.ivRecentLive4, binding.tvRecentLive4)
         }
     }
 
