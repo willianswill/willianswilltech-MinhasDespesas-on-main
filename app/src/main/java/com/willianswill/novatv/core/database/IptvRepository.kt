@@ -303,22 +303,17 @@ class IptvRepository(context: Context) {
         val favStreamUrls = streamDao.getFavoriteUrls(profile.id).toHashSet()
         val favSeriesIds = seriesDao.getFavoriteSeriesIds(profile.id).toHashSet()
 
-        val (vodCats, seriesCats, vodDtos, seriesDtos) = coroutineScope {
+        val (catsPair, streamsPair) = coroutineScope {
             val vc = async { runCatching { xtreamClient.getVodCategories(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
             val sc = async { runCatching { xtreamClient.getSeriesCategories(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
             val vs = async { runCatching { xtreamClient.getVodStreams(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
             val ss = async { runCatching { xtreamClient.getSeries(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
-            listOf(vc.await(), sc.await(), vs.await(), ss.await())
+            (vc.await() to sc.await()) to (vs.await() to ss.await())
         }
-
-        @Suppress("UNCHECKED_CAST")
-        val vCats = vodCats as List<com.willianswill.novatv.core.network.XtreamCategoryDto>
-        @Suppress("UNCHECKED_CAST")
-        val sCats = seriesCats as List<com.willianswill.novatv.core.network.XtreamCategoryDto>
-        @Suppress("UNCHECKED_CAST")
-        val vDtos = vodDtos as List<com.willianswill.novatv.core.network.XtreamVodStreamDto>
-        @Suppress("UNCHECKED_CAST")
-        val sDtos = seriesDtos as List<com.willianswill.novatv.core.network.XtreamSeriesDto>
+        val vCats = catsPair.first
+        val sCats = catsPair.second
+        val vDtos = streamsPair.first
+        val sDtos = streamsPair.second
 
         val vodCatMap = HashMap<String, String>()
         val seriesCatMap = HashMap<String, String>()
