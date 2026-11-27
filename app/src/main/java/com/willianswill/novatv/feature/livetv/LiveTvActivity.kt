@@ -49,6 +49,7 @@ class LiveTvActivity : AppCompatActivity() {
     private var pagingJob: Job? = null
     private var epgPreviewJob: Job? = null
     private var moveFocusToFirstChannel = false
+    private var pendingGloboSpFocusId: Long? = null
     private var autoPlayedGloboSp = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,11 +114,23 @@ class LiveTvActivity : AppCompatActivity() {
             }
         )
         channelAdapter.addLoadStateListener { loadStates ->
-            if (moveFocusToFirstChannel && loadStates.refresh is LoadState.NotLoading && channelAdapter.itemCount > 0) {
-                moveFocusToFirstChannel = false
-                binding.rvChannels.scrollToPosition(0)
-                binding.rvChannels.post {
-                    binding.rvChannels.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+            if (loadStates.refresh is LoadState.NotLoading && channelAdapter.itemCount > 0) {
+                val targetGloboId = pendingGloboSpFocusId
+                if (targetGloboId != null) {
+                    pendingGloboSpFocusId = null
+                    moveFocusToFirstChannel = false
+                    val idx = channelAdapter.snapshot().items.indexOfFirst { it.id == targetGloboId }
+                    val targetPos = if (idx >= 0) idx else 0
+                    (binding.rvChannels.layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(targetPos, 120)
+                    binding.rvChannels.post {
+                        binding.rvChannels.findViewHolderForAdapterPosition(targetPos)?.itemView?.requestFocus()
+                    }
+                } else if (moveFocusToFirstChannel) {
+                    moveFocusToFirstChannel = false
+                    binding.rvChannels.scrollToPosition(0)
+                    binding.rvChannels.post {
+                        binding.rvChannels.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+                    }
                 }
             }
         }
@@ -129,9 +142,6 @@ class LiveTvActivity : AppCompatActivity() {
         binding.btnBack.enableCinemaFocusZoom(1.05f)
         binding.btnMultiview.enableCinemaFocusZoom(1.05f)
         binding.btnFullscreen.enableCinemaFocusZoom(1.05f)
-        binding.rvCategories.post {
-            binding.rvCategories.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
-        }
 
         binding.btnBack.setOnClickListener { finish() }
 
@@ -190,6 +200,15 @@ class LiveTvActivity : AppCompatActivity() {
                         val globoSp = repository.findPreferredGloboSp(profile.id)
                         if (globoSp != null && currentPreviewStream == null) {
                             previewChannel(globoSp)
+                            pendingGloboSpFocusId = globoSp.id
+                            if (globoSp.categoryId.isNotBlank()) {
+                                selectedCategoryId = globoSp.categoryId
+                                onlyFavorites = false
+                                categoryAdapter.setSelectedCategory(globoSp.categoryId)
+                                loadPagedChannels()
+                            }
+                        } else {
+                            moveFocusToFirstChannel = true
                         }
                     }
                 }

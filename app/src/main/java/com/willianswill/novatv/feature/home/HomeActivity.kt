@@ -83,7 +83,30 @@ class HomeActivity : AppCompatActivity() {
         setupCarousels()
         setupNavigation()
         observeActiveProfile()
+        setupBackExitConfirmation()
         binding.root.postDelayed({ checkAppUpdateOnStartup() }, 4_000L)
+    }
+
+    private fun setupBackExitConfirmation() {
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val dialog = AlertDialog.Builder(this@HomeActivity)
+                    .setTitle("Sair do Wtv Canais Online?")
+                    .setMessage("Deseja realmente fechar o aplicativo?")
+                    .setPositiveButton("Sair") { _, _ ->
+                        finishAffinity()
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .create()
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.let { cancelBtn ->
+                        cancelBtn.requestFocus()
+                        cancelBtn.post { cancelBtn.requestFocus() }
+                    }
+                }
+                dialog.show()
+            }
+        })
     }
 
     override fun onResume() {
@@ -96,6 +119,10 @@ class HomeActivity : AppCompatActivity() {
         checkAndApplyMacPlaylist(manual = false)
         bannerHandler.removeCallbacks(autoRotateBanner)
         bannerHandler.postDelayed(autoRotateBanner, 6000L)
+        if (binding.bannerNoProfile.visibility != View.VISIBLE) {
+            (binding.root as? android.widget.ScrollView)?.scrollTo(0, 0)
+            binding.cardLiveTv.post { binding.cardLiveTv.requestFocus() }
+        }
     }
 
     override fun onPause() {

@@ -63,6 +63,23 @@ class ProfilePickerActivity : AppCompatActivity() {
         refreshProfiles()
         setupDeviceMacBanner()
         verifyRemoteBlockStatus()
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val dialog = AlertDialog.Builder(this@ProfilePickerActivity)
+                    .setTitle("Sair do Wtv Canais Online?")
+                    .setMessage("Deseja realmente fechar o aplicativo?")
+                    .setPositiveButton("Sair") { _, _ -> finishAffinity() }
+                    .setNegativeButton("Cancelar", null)
+                    .create()
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.let { btn ->
+                        btn.requestFocus()
+                        btn.post { btn.requestFocus() }
+                    }
+                }
+                dialog.show()
+            }
+        })
     }
 
     private fun setupDeviceMacBanner() {
