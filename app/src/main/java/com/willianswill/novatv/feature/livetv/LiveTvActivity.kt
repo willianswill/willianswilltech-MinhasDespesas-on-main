@@ -105,8 +105,14 @@ class LiveTvActivity : AppCompatActivity() {
                 }
             },
             onToggleFav = { stream ->
+                val newFav = !stream.isFavorite
                 lifecycleScope.launch {
-                    repository.toggleStreamFavorite(stream.id, !stream.isFavorite)
+                    repository.toggleStreamFavorite(stream.id, newFav)
+                    Toast.makeText(
+                        this@LiveTvActivity,
+                        if (newFav) "★ ${stream.baseName} adicionado aos Favoritos" else "☆ ${stream.baseName} removido dos Favoritos",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             },
             onChannelFocused = { stream ->

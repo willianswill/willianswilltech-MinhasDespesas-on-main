@@ -87,6 +87,10 @@ class LiveChannelPagingAdapter(
                 if (hasFocus) onChannelFocused(item)
             }
             binding.root.setOnClickListener { onPreviewOrPlay(item, pos) }
+            binding.root.setOnLongClickListener {
+                onToggleFav(item)
+                true
+            }
             binding.btnFav.setOnClickListener { onToggleFav(item) }
         }
 

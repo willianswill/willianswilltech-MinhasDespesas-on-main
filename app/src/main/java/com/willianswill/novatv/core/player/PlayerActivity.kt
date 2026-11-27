@@ -274,7 +274,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         listOf(
             binding.btnBack, binding.btnPrev, binding.btnPlayPause, binding.btnNext,
             binding.btnTracks, binding.btnQuality, binding.btnAspect, binding.btnReload,
-            binding.btnChannelList, binding.btnNextEpisode,
+            binding.btnChannelList, binding.btnFavPlayer, binding.btnNextEpisode,
             binding.btnCatchup, binding.btnMultiview, binding.btnPip,
             binding.btnQpAudio, binding.btnQpSubtitles, binding.btnQpEpisodes, binding.btnQpClose,
             binding.cardRecentLive1, binding.cardRecentLive2,
@@ -321,6 +321,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
 
         binding.btnPrev.setOnClickListener { zap(-1) }
         binding.btnNext.setOnClickListener { zap(1) }
+        binding.btnFavPlayer.setOnClickListener { toggleCurrentItemFavorite() }
 
         binding.btnAspect.setOnClickListener {
             resizeIdx = (resizeIdx + 1) % resizeModes.size
@@ -399,6 +400,31 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         startPlayback(isRetry = false)
     }
 
+    private fun updateFavPlayerUi(isFav: Boolean) {
+        binding.btnFavPlayer.text = if (isFav) "★ Favorito" else "☆ Favoritar"
+        binding.btnFavPlayer.setTextColor(if (isFav) 0xFFFACC15.toInt() else 0xFFFFFFFF.toInt())
+    }
+
+    private fun toggleCurrentItemFavorite() {
+        val item = items.getOrNull(currentIndex) ?: return
+        val newFav = !item.isFavorite
+        val updated = items.toMutableList()
+        updated[currentIndex] = item.copy(isFavorite = newFav)
+        items = updated
+        updateFavPlayerUi(newFav)
+        if (item.streamDbId > 0L) {
+            lifecycleScope.launch {
+                repository.toggleStreamFavorite(item.streamDbId, newFav)
+            }
+        }
+        Toast.makeText(
+            this,
+            if (newFav) "★ ${item.title} adicionado aos Favoritos" else "☆ ${item.title} removido dos Favoritos",
+            Toast.LENGTH_SHORT
+        ).show()
+        scheduleHideControls()
+    }
+
     private fun zap(delta: Int) {
         if (items.size <= 1) return
         val next = (currentIndex + delta + items.size) % items.size
@@ -427,6 +453,9 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
 
         val isVod = item.mediaType != MediaType.LIVE || overrideCatchupUrl != null
         binding.seekContainer.visibility = if (isVod) View.VISIBLE else View.GONE
+        binding.btnPrev.visibility = if (isVod) View.VISIBLE else View.GONE
+        binding.btnNext.visibility = if (isVod) View.VISIBLE else View.GONE
+        updateFavPlayerUi(item.isFavorite)
 
         val chosen = currentVariant
         val qualitySuffix = if (chosen != null && activeVariants.size > 1) " (${chosen.label})" else ""
