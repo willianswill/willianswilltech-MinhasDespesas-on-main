@@ -48,11 +48,11 @@ class NovaTvApp : MultiDexApplication() {
     override fun onCreate() {
         super.onCreate()
         com.willianswill.novatv.core.security.AppIntegrityGuard.verifyOrTerminate(this)
-        // Faz o Glide usar o imageClient resiliente (User-Agent navegador + SSL IPTV + Redirects + IPv4/DoH)
+        // Faz o Glide usar o imageClient resiliente de forma lazy (sem travar a main thread no boot)
         Glide.get(this).registry.replace(
             GlideUrl::class.java,
             InputStream::class.java,
-            OkHttpUrlLoader.Factory(HttpClientProvider.imageClient)
+            OkHttpUrlLoader.Factory(okhttp3.Call.Factory { req -> HttpClientProvider.imageClient.newCall(req) })
         )
 
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {

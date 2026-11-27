@@ -83,7 +83,7 @@ class HomeActivity : AppCompatActivity() {
         setupCarousels()
         setupNavigation()
         observeActiveProfile()
-        checkAppUpdateOnStartup()
+        binding.root.postDelayed({ checkAppUpdateOnStartup() }, 4_000L)
     }
 
     override fun onResume() {
@@ -421,9 +421,12 @@ class HomeActivity : AppCompatActivity() {
                     binding.cardLiveTv.post { binding.cardLiveTv.requestFocus() }
                 }
 
-                if (!startupSyncTriggered && System.currentTimeMillis() - profile.lastSyncAt > 30L * 60L * 1000L) {
+                if (!startupSyncTriggered &&
+                    (profile.lastSyncAt == 0L || System.currentTimeMillis() - profile.lastSyncAt > 12L * 60L * 60L * 1000L)
+                ) {
                     startupSyncTriggered = true
                     lifecycleScope.launch {
+                        kotlinx.coroutines.delay(6_000L)
                         runCatching {
                             val updated = repository.syncActiveProfile()
                             if (updated != null && updated.epgUrl.isNotBlank()) {

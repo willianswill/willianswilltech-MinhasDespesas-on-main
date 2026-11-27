@@ -17,6 +17,8 @@ import com.willianswill.novatv.core.parser.StreamingM3uParser
 import com.willianswill.novatv.core.player.UserProfileManager
 import com.willianswill.novatv.core.parser.StreamingXmltvParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
@@ -211,15 +213,12 @@ class IptvRepository(context: Context) {
         val favStreamUrls = streamDao.getFavoriteUrls(profile.id).toHashSet()
         val favSeriesIds = seriesDao.getFavoriteSeriesIds(profile.id).toHashSet()
 
-        val liveCats = runCatching {
-            xtreamClient.getLiveCategories(profile.serverUrl, profile.username, profile.password, ua)
-        }.getOrDefault(emptyList())
-        val vodCats = runCatching {
-            xtreamClient.getVodCategories(profile.serverUrl, profile.username, profile.password, ua)
-        }.getOrDefault(emptyList())
-        val seriesCats = runCatching {
-            xtreamClient.getSeriesCategories(profile.serverUrl, profile.username, profile.password, ua)
-        }.getOrDefault(emptyList())
+        val (liveCats, vodCats, seriesCats) = coroutineScope {
+            val l = async { runCatching { xtreamClient.getLiveCategories(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            val v = async { runCatching { xtreamClient.getVodCategories(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            val s = async { runCatching { xtreamClient.getSeriesCategories(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            Triple(l.await(), v.await(), s.await())
+        }
 
         val catNameMap = HashMap<String, String>()
         val categoryEntities = ArrayList<CategoryEntity>()
@@ -268,13 +267,16 @@ class IptvRepository(context: Context) {
         streamDao.deleteByProfile(profile.id)
         seriesDao.deleteByProfile(profile.id)
 
-        categoryEntities.chunked(500).forEach { categoryDao.insertAll(it) }
+        categoryEntities.chunked(1000).forEach { categoryDao.insertAll(it) }
 
-        val liveDtos = runCatching {
-            xtreamClient.getLiveStreams(profile.serverUrl, profile.username, profile.password, ua)
-        }.getOrDefault(emptyList())
+        val (liveDtos, vodDtos, seriesDtos) = coroutineScope {
+            val l = async { runCatching { xtreamClient.getLiveStreams(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            val v = async { runCatching { xtreamClient.getVodStreams(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            val s = async { runCatching { xtreamClient.getSeries(profile.serverUrl, profile.username, profile.password, ua) }.getOrDefault(emptyList()) }
+            Triple(l.await(), v.await(), s.await())
+        }
 
-        liveDtos.chunked(500).forEach { chunk ->
+        liveDtos.chunked(1500).forEach { chunk ->
             val entities = chunk.map { dto ->
                 val url = xtreamClient.buildLiveUrl(profile.serverUrl, profile.username, profile.password, dto.streamId, "ts")
                 val catId = dto.categoryId.orEmpty()
@@ -304,11 +306,7 @@ class IptvRepository(context: Context) {
             streamDao.insertAll(entities)
         }
 
-        val vodDtos = runCatching {
-            xtreamClient.getVodStreams(profile.serverUrl, profile.username, profile.password, ua)
-        }.getOrDefault(emptyList())
-
-        vodDtos.chunked(500).forEach { chunk ->
+        vodDtos.chunked(1500).forEach { chunk ->
             val entities = chunk.map { dto ->
                 val ext = dto.containerExtension.orEmpty().ifBlank { "mp4" }
                 val url = xtreamClient.buildMovieUrl(profile.serverUrl, profile.username, profile.password, dto.streamId, ext)
@@ -335,11 +333,7 @@ class IptvRepository(context: Context) {
             streamDao.insertAll(entities)
         }
 
-        val seriesDtos = runCatching {
-            xtreamClient.getSeries(profile.serverUrl, profile.username, profile.password, ua)
-        }.getOrDefault(emptyList())
-
-        seriesDtos.chunked(500).forEach { chunk ->
+        seriesDtos.chunked(1500).forEach { chunk ->
             val entities = chunk.map { dto ->
                 val sid = dto.seriesId?.content.orEmpty().ifBlank { dto.name.hashCode().toString() }
                 val catId = dto.categoryId.orEmpty()
