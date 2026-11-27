@@ -35,6 +35,29 @@ interface SeriesDao {
     @Query(
         """
         SELECT * FROM series
+        WHERE profileId = :profileId
+          AND (:includeAdult = 1 OR isAdult = 0)
+          AND (
+            LOWER(categoryName) LIKE '%' || :kw1 || '%'
+            OR LOWER(categoryName) LIKE '%' || :kw2 || '%'
+            OR (:kw3 != '' AND LOWER(categoryName) LIKE '%' || :kw3 || '%')
+          )
+        ORDER BY lastModified DESC, id DESC
+        LIMIT :limit
+        """
+    )
+    fun observeSeriesByCategoryKeywords(
+        profileId: Long,
+        kw1: String,
+        kw2: String,
+        kw3: String = "",
+        includeAdult: Boolean,
+        limit: Int = 10
+    ): Flow<List<SeriesEntity>>
+
+    @Query(
+        """
+        SELECT * FROM series
         WHERE profileId = :profileId AND (:includeAdult = 1 OR isAdult = 0)
         ORDER BY lastModified DESC, id DESC
         LIMIT :limit

@@ -482,6 +482,106 @@
             android:id="@+id/rv_recent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+        <!-- Section: Top 10 Lançamentos -->
+        <TextView
+            android:id="@+id/tv_section_top_launch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="🔥 Top 10 Lançamentos"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_top_launch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+        <!-- Section: Top 10 Netflix -->
+        <TextView
+            android:id="@+id/tv_section_top_netflix"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="🔴 Top 10 Netflix"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_top_netflix"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+        <!-- Section: Top 10 Prime Video -->
+        <TextView
+            android:id="@+id/tv_section_top_prime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="🔵 Top 10 Prime Video"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_top_prime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+        <!-- Section: Top 10 HBO Max -->
+        <TextView
+            android:id="@+id/tv_section_top_hbo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="🟣 Top 10 HBO Max"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_top_hbo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:clipToPadding="false"
+            android:visibility="gone" />
+
+        <!-- Section: Top 10 Disney+ -->
+        <TextView
+            android:id="@+id/tv_section_top_disney"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="✨ Top 10 Disney+"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_top_disney"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:clipToPadding="false"
             android:visibility="gone" />
 

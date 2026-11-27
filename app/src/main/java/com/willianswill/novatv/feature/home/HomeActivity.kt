@@ -17,6 +17,7 @@ import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.ProfileEntity
 import com.willianswill.novatv.core.database.entity.ProfileType
+import com.willianswill.novatv.core.database.entity.SeriesEntity
 import com.willianswill.novatv.core.database.entity.WatchHistoryEntity
 import com.willianswill.novatv.core.network.AppUpdateChecker
 import com.willianswill.novatv.core.network.AppUpdateInfo
@@ -35,6 +36,7 @@ import com.willianswill.novatv.feature.search.GlobalSearchActivity
 import com.willianswill.novatv.feature.playlists.PlaylistsActivity
 import com.willianswill.novatv.feature.profiles.ProfilePickerActivity
 import com.willianswill.novatv.feature.settings.SettingsActivity
+import com.willianswill.novatv.feature.vod.MovieDetailActivity
 import com.willianswill.novatv.feature.vod.SeriesDetailActivity
 import com.willianswill.novatv.feature.vod.VodCatalogActivity
 import kotlinx.coroutines.Job
@@ -56,7 +58,13 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var recentMoviesAdapter: HomeCarouselAdapter
     private lateinit var favAdapter: HomeCarouselAdapter
     private lateinit var recentAddedAdapter: HomeCarouselAdapter
+    private lateinit var topLaunchAdapter: HomeCarouselAdapter
+    private lateinit var topNetflixAdapter: HomeCarouselAdapter
+    private lateinit var topPrimeAdapter: HomeCarouselAdapter
+    private lateinit var topHboAdapter: HomeCarouselAdapter
+    private lateinit var topDisneyAdapter: HomeCarouselAdapter
 
+    private val top10SeriesCache = HashMap<String, SeriesEntity>()
     private var favPlayables: List<PlayableItem> = emptyList()
     private var bannerCount = 0
     private var profileDataJob: Job? = null
@@ -198,6 +206,49 @@ class HomeActivity : AppCompatActivity() {
         favAdapter = HomeCarouselAdapter(openDirect)
         recentAddedAdapter = HomeCarouselAdapter(openDirect)
 
+        val openTop10Item: (List<PlayableItem>, Int) -> Unit = { list, idx ->
+            val item = list[idx]
+            if (item.mediaType == MediaType.SERIES && item.seriesId.isNotBlank()) {
+                val s = top10SeriesCache[item.seriesId]
+                if (s != null) {
+                    startActivity(
+                        Intent(this, SeriesDetailActivity::class.java).apply {
+                            putExtra(SeriesDetailActivity.EXTRA_SERIES_DB_ID, s.id)
+                            putExtra(SeriesDetailActivity.EXTRA_SERIES_ID, s.seriesId)
+                            putExtra(SeriesDetailActivity.EXTRA_NAME, s.name)
+                            putExtra(SeriesDetailActivity.EXTRA_COVER, s.coverUrl)
+                            putExtra(SeriesDetailActivity.EXTRA_CATEGORY, s.categoryName)
+                            putExtra(SeriesDetailActivity.EXTRA_PLOT, s.plot)
+                            putExtra(SeriesDetailActivity.EXTRA_RATING, s.rating)
+                            putExtra(SeriesDetailActivity.EXTRA_IS_FAV, s.isFavorite)
+                        }
+                    )
+                } else launchPlayer(list, idx)
+            } else if (item.mediaType == MediaType.MOVIE) {
+                startActivity(
+                    Intent(this, MovieDetailActivity::class.java).apply {
+                        putExtra(MovieDetailActivity.EXTRA_DB_ID, item.streamDbId)
+                        putExtra(MovieDetailActivity.EXTRA_STREAM_ID, item.streamId)
+                        putExtra(MovieDetailActivity.EXTRA_NAME, item.title)
+                        putExtra(MovieDetailActivity.EXTRA_COVER, item.iconUrl)
+                        putExtra(MovieDetailActivity.EXTRA_CATEGORY, item.subtitle)
+                        putExtra(MovieDetailActivity.EXTRA_STREAM_URL, item.streamUrl)
+                        putExtra(MovieDetailActivity.EXTRA_USER_AGENT, item.userAgent)
+                        putExtra(MovieDetailActivity.EXTRA_REFERRER, item.referrer)
+                        putExtra(MovieDetailActivity.EXTRA_IS_FAV, item.isFavorite)
+                    }
+                )
+            } else {
+                launchPlayer(list, idx)
+            }
+        }
+
+        topLaunchAdapter = HomeCarouselAdapter(openTop10Item)
+        topNetflixAdapter = HomeCarouselAdapter(openTop10Item)
+        topPrimeAdapter = HomeCarouselAdapter(openTop10Item)
+        topHboAdapter = HomeCarouselAdapter(openTop10Item)
+        topDisneyAdapter = HomeCarouselAdapter(openTop10Item)
+
         binding.rvRecentChannels.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.rvRecentChannels.adapter = recentChannelsAdapter
 
@@ -212,6 +263,17 @@ class HomeActivity : AppCompatActivity() {
 
         binding.rvRecent.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.rvRecent.adapter = recentAddedAdapter
+
+        listOf(
+            binding.rvTopLaunch to topLaunchAdapter,
+            binding.rvTopNetflix to topNetflixAdapter,
+            binding.rvTopPrime to topPrimeAdapter,
+            binding.rvTopHbo to topHboAdapter,
+            binding.rvTopDisney to topDisneyAdapter
+        ).forEach { (rv, adp) ->
+            rv.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+            rv.adapter = adp
+        }
     }
 
     private fun launchPlayer(list: List<PlayableItem>, idx: Int) {
@@ -617,6 +679,64 @@ class HomeActivity : AppCompatActivity() {
                             binding.heroCarouselContainer.visibility = if (bannerCount > 0) View.VISIBLE else View.GONE
                             if (bannerCount > 0) {
                                 binding.tvBannerCounter.text = "${binding.vpHeroBanners.currentItem + 1}/$bannerCount"
+                            }
+                        }
+                    }
+
+                    val top10Specs = listOf(
+                        listOf("lançamento", "lancamento", "novidade") to (binding.tvSectionTopLaunch to (binding.rvTopLaunch to topLaunchAdapter)),
+                        listOf("netflix", "netflix", "") to (binding.tvSectionTopNetflix to (binding.rvTopNetflix to topNetflixAdapter)),
+                        listOf("prime", "amazon", "") to (binding.tvSectionTopPrime to (binding.rvTopPrime to topPrimeAdapter)),
+                        listOf("hbo", "max", "") to (binding.tvSectionTopHbo to (binding.rvTopHbo to topHboAdapter)),
+                        listOf("disney", "disney", "") to (binding.tvSectionTopDisney to (binding.rvTopDisney to topDisneyAdapter))
+                    )
+                    top10Specs.forEach { (kws, uiPair) ->
+                        val titleView = uiPair.first
+                        val rv = uiPair.second.first
+                        val adapter = uiPair.second.second
+                        launch {
+                            repository.observeTop10ByKeywords(
+                                profileId = profile.id,
+                                kw1 = kws[0],
+                                kw2 = kws[1],
+                                kw3 = kws[2],
+                                includeAdult = includeAdult
+                            ).collectLatest { (movies, series) ->
+                                val movieItems = movies.map { s ->
+                                    HomeCarouselItem(
+                                        PlayableItem(
+                                            contentKey = s.streamUrl,
+                                            title = s.name,
+                                            subtitle = s.categoryName,
+                                            streamUrl = s.streamUrl,
+                                            iconUrl = s.iconUrl,
+                                            mediaType = MediaType.MOVIE,
+                                            streamId = s.streamId,
+                                            userAgent = s.userAgent,
+                                            referrer = s.referrer,
+                                            streamDbId = s.id,
+                                            isFavorite = s.isFavorite
+                                        )
+                                    )
+                                }
+                                val seriesItems = series.map { sr ->
+                                    top10SeriesCache[sr.seriesId] = sr
+                                    HomeCarouselItem(
+                                        PlayableItem(
+                                            contentKey = "series_${sr.seriesId}",
+                                            title = sr.name,
+                                            subtitle = sr.categoryName,
+                                            streamUrl = "",
+                                            iconUrl = sr.coverUrl,
+                                            mediaType = MediaType.SERIES,
+                                            seriesId = sr.seriesId,
+                                            isFavorite = sr.isFavorite
+                                        )
+                                    )
+                                }
+                                val combinedTop10 = (movieItems + seriesItems).take(10)
+                                adapter.submitList(combinedTop10)
+                                toggleSection(titleView, rv, combinedTop10.isNotEmpty())
                             }
                         }
                     }

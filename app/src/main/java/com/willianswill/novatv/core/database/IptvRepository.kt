@@ -23,6 +23,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
@@ -129,6 +130,17 @@ class IptvRepository(context: Context) {
 
     fun observeFavorites(profileId: Long, includeAdult: Boolean) =
         streamDao.observeFavorites(profileId, includeAdult)
+
+    fun observeTop10ByKeywords(
+        profileId: Long,
+        kw1: String,
+        kw2: String,
+        kw3: String = "",
+        includeAdult: Boolean
+    ): Flow<Pair<List<StreamEntity>, List<SeriesEntity>>> = combine(
+        streamDao.observeMoviesByCategoryKeywords(profileId, kw1, kw2, kw3, includeAdult, 10),
+        seriesDao.observeSeriesByCategoryKeywords(profileId, kw1, kw2, kw3, includeAdult, 10)
+    ) { movies, series -> movies to series }
 
     fun observeRecentlyAdded(profileId: Long, mediaType: String, includeAdult: Boolean) =
         streamDao.observeRecentlyAdded(profileId, mediaType, includeAdult)
