@@ -417,10 +417,13 @@ class VodCatalogActivity : AppCompatActivity() {
                         .setNegativeButton("Fechar", null)
                         .create()
 
-                    recycler.adapter = EpisodeProgressAdapter(entries) { idx ->
-                        dialog.dismiss()
-                        launchWithResumeChoice(entries.map { it.playable }, idx)
-                    }
+                    recycler.adapter = EpisodeProgressAdapter(
+                        items = entries,
+                        onSelect = { idx ->
+                            dialog.dismiss()
+                            launchWithResumeChoice(entries.map { it.playable }, idx)
+                        }
+                    )
                     dialog.show()
                 }
             } catch (e: Exception) {
