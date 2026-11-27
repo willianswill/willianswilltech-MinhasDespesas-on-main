@@ -222,21 +222,44 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        binding.cardLiveTv.enableCinemaFocusZoom(1.05f)
-        binding.cardMovies.enableCinemaFocusZoom(1.05f)
-        binding.cardSeries.enableCinemaFocusZoom(1.05f)
-        binding.cardMultiview.enableCinemaFocusZoom(1.05f)
-        binding.btnSwitchProfile.enableCinemaFocusZoom(1.06f)
-        binding.btnPlaylists.enableCinemaFocusZoom(1.06f)
-        binding.btnSettings.enableCinemaFocusZoom(1.06f)
-        binding.btnAddFirstPlaylist.enableCinemaFocusZoom(1.05f)
-        binding.btnCheckMacPlaylist.enableCinemaFocusZoom(1.05f)
+        binding.cardLiveTv.enableCinemaFocusZoom(1.06f)
+        binding.cardMovies.enableCinemaFocusZoom(1.06f)
+        binding.cardSeries.enableCinemaFocusZoom(1.06f)
+        binding.cardMultiview.enableCinemaFocusZoom(1.06f)
+
+        listOf(
+            binding.btnSwitchProfile, binding.btnPlaylists, binding.btnSettings,
+            binding.btnAddFirstPlaylist, binding.btnCheckMacPlaylist,
+            binding.btnBannerPrev, binding.btnBannerNext
+        ).forEach { btn ->
+            btn.backgroundTintList = null
+            btn.enableCinemaFocusZoom(1.10f)
+        }
+
+        // Navegação previsível entre a barra superior e os cards principais (sem pular para o rodapé)
+        binding.btnSwitchProfile.nextFocusDownId = com.willianswill.novatv.R.id.card_live_tv
+        binding.btnPlaylists.nextFocusDownId = com.willianswill.novatv.R.id.card_movies
+        binding.btnSettings.nextFocusDownId = com.willianswill.novatv.R.id.card_series
+        binding.btnSwitchProfile.nextFocusRightId = com.willianswill.novatv.R.id.btn_playlists
+        binding.btnPlaylists.nextFocusLeftId = com.willianswill.novatv.R.id.btn_switch_profile
+        binding.btnPlaylists.nextFocusRightId = com.willianswill.novatv.R.id.btn_settings
+        binding.btnSettings.nextFocusLeftId = com.willianswill.novatv.R.id.btn_playlists
+
+        binding.cardLiveTv.nextFocusUpId = com.willianswill.novatv.R.id.btn_switch_profile
+        binding.cardMovies.nextFocusUpId = com.willianswill.novatv.R.id.btn_playlists
+        binding.cardSeries.nextFocusUpId = com.willianswill.novatv.R.id.btn_settings
+        binding.cardMultiview.nextFocusUpId = com.willianswill.novatv.R.id.btn_settings
+
+        binding.btnBannerPrev.nextFocusUpId = com.willianswill.novatv.R.id.btn_playlists
+        binding.btnBannerPrev.nextFocusDownId = com.willianswill.novatv.R.id.card_live_tv
+        binding.btnBannerNext.nextFocusUpId = com.willianswill.novatv.R.id.btn_settings
+        binding.btnBannerNext.nextFocusDownId = com.willianswill.novatv.R.id.card_live_tv
+        binding.vpHeroBanners.getChildAt(0)?.isFocusable = false
+
         binding.tvHomeDeviceMac.text = "📡 MAC do Aparelho: ${TelemetryManager.getDeviceMac(this)}"
         binding.btnCheckMacPlaylist.setOnClickListener {
             checkAndApplyMacPlaylist(manual = true)
         }
-        binding.btnBannerPrev.enableCinemaFocusZoom(1.06f)
-        binding.btnBannerNext.enableCinemaFocusZoom(1.06f)
 
         binding.btnBannerPrev.setOnClickListener {
             if (bannerCount > 1) {
