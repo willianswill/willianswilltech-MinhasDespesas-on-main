@@ -32,7 +32,8 @@
             android:name=".feature.profiles.ProfilePickerActivity"
             android:configChanges="screenSize|screenLayout|orientation|keyboardHidden"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.NovaTV.Launcher">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -63,11 +64,19 @@
             android:exported="false" />
 
         <activity
+            android:name=".feature.vod.MovieDetailActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".feature.settings.SettingsActivity"
             android:exported="false" />
 
         <activity
             android:name=".feature.downloads.DownloadsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".feature.search.GlobalSearchActivity"
             android:exported="false" />
 
         <activity

@@ -228,96 +228,21 @@ class VodCatalogActivity : AppCompatActivity() {
     }
 
     private fun showMovieDetails(movie: StreamEntity) {
-        val profile = activeProfile ?: return
-        lifecycleScope.launch {
-            val saved = repository.getWatchProgress(profile.id, movie.streamUrl)
-            val resumeMs = saved?.positionMs ?: 0L
-            val favLabel = if (movie.isFavorite) "Remover Favorito" else "★ Favoritar"
-            val info = buildString {
-                append("Categoria: ${movie.categoryName}\n")
-                if (movie.rating.isNotBlank()) append("Nota: ★ ${movie.rating}\n")
-                if (resumeMs > 5_000L) append("Progresso salvo: ${formatTime(resumeMs)}\n")
-                if (movie.plot.isNotBlank()) append("\n${movie.plot}")
+        startActivity(
+            Intent(this, MovieDetailActivity::class.java).apply {
+                putExtra(MovieDetailActivity.EXTRA_DB_ID, movie.id)
+                putExtra(MovieDetailActivity.EXTRA_STREAM_ID, movie.streamId)
+                putExtra(MovieDetailActivity.EXTRA_NAME, movie.name)
+                putExtra(MovieDetailActivity.EXTRA_COVER, movie.iconUrl)
+                putExtra(MovieDetailActivity.EXTRA_CATEGORY, movie.categoryName)
+                putExtra(MovieDetailActivity.EXTRA_PLOT, movie.plot)
+                putExtra(MovieDetailActivity.EXTRA_RATING, movie.rating)
+                putExtra(MovieDetailActivity.EXTRA_STREAM_URL, movie.streamUrl)
+                putExtra(MovieDetailActivity.EXTRA_USER_AGENT, movie.userAgent)
+                putExtra(MovieDetailActivity.EXTRA_REFERRER, movie.referrer)
+                putExtra(MovieDetailActivity.EXTRA_IS_FAV, movie.isFavorite)
             }
-
-            val baseItem = PlayableItem(
-                contentKey = movie.streamUrl,
-                title = movie.name,
-                subtitle = movie.categoryName,
-                streamUrl = movie.streamUrl,
-                iconUrl = movie.iconUrl,
-                mediaType = MediaType.MOVIE,
-                streamId = movie.streamId,
-                userAgent = movie.userAgent,
-                referrer = movie.referrer,
-                resumePositionMs = resumeMs,
-                streamDbId = movie.id,
-                isFavorite = movie.isFavorite
-            )
-
-            val existingDl = OfflineDownloadManager.findByUrl(this@VodCatalogActivity, movie.streamUrl)
-            val dlLabel = when (existingDl?.status) {
-                DownloadStatus.COMPLETED -> "✓ Offline (Excluir)"
-                DownloadStatus.DOWNLOADING, DownloadStatus.QUEUED -> "⏳ Baixando..."
-                else -> "⬇ Baixar Offline"
-            }
-
-            val favBtn = android.widget.Button(this@VodCatalogActivity).apply {
-                text = favLabel
-                isFocusable = true
-                setOnClickListener {
-                    lifecycleScope.launch {
-                        repository.toggleStreamFavorite(movie.id, !movie.isFavorite)
-                        Toast.makeText(
-                            this@VodCatalogActivity,
-                            if (!movie.isFavorite) "★ Adicionado aos Favoritos" else "☆ Removido dos Favoritos",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            }
-            val msgView = android.widget.TextView(this@VodCatalogActivity).apply {
-                text = info
-                setPadding(48, 24, 48, 12)
-                textSize = 14f
-            }
-            val container = android.widget.LinearLayout(this@VodCatalogActivity).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                addView(msgView)
-                addView(favBtn)
-            }
-
-            val dialog = AlertDialog.Builder(this@VodCatalogActivity)
-                .setTitle(movie.name)
-                .setView(container)
-                .setPositiveButton("▶ Assistir") { _, _ ->
-                    launchWithResumeChoice(listOf(baseItem), 0)
-                }
-                .setNeutralButton(dlLabel) { _, _ ->
-                    when (existingDl?.status) {
-                        DownloadStatus.COMPLETED -> {
-                            OfflineDownloadManager.deleteDownload(this@VodCatalogActivity, existingDl.id)
-                            Toast.makeText(this@VodCatalogActivity, "Download removido.", Toast.LENGTH_SHORT).show()
-                        }
-                        DownloadStatus.DOWNLOADING, DownloadStatus.QUEUED -> {
-                            Toast.makeText(this@VodCatalogActivity, "Download em andamento (veja em ⬇ Offline).", Toast.LENGTH_SHORT).show()
-                        }
-                        else -> {
-                            OfflineDownloadManager.enqueueDownload(this@VodCatalogActivity, baseItem)
-                            Toast.makeText(this@VodCatalogActivity, "⬇ Baixando ${movie.name} em segundo plano...", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
-                .setNegativeButton("Fechar", null)
-                .create()
-            dialog.setOnShowListener {
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.let { playBtn ->
-                    playBtn.requestFocus()
-                    playBtn.post { playBtn.requestFocus() }
-                }
-            }
-            dialog.show()
-        }
+        )
     }
 
     private fun showSeriesEpisodes(series: SeriesEntity) {

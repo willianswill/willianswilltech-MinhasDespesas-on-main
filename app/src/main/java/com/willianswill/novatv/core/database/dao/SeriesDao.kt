@@ -42,6 +42,23 @@ interface SeriesDao {
     )
     fun observeRecentlyAdded(profileId: Long, includeAdult: Boolean, limit: Int = 30): Flow<List<SeriesEntity>>
 
+    @Query(
+        """
+        SELECT * FROM series
+        WHERE profileId = :profileId
+          AND (:includeAdult = 1 OR isAdult = 0)
+          AND name LIKE '%' || :query || '%'
+        ORDER BY name ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun searchGlobal(
+        profileId: Long,
+        query: String,
+        includeAdult: Boolean,
+        limit: Int = 30
+    ): List<SeriesEntity>
+
     @Query("SELECT seriesId FROM series WHERE profileId = :profileId AND isFavorite = 1")
     suspend fun getFavoriteSeriesIds(profileId: Long): List<String>
 

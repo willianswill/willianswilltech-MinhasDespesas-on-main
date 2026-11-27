@@ -15,6 +15,10 @@
         <item name="android:navigationBarColor">@color/bg_cinema</item>
     </style>
 
+    <style name="Theme.NovaTV.Launcher" parent="Theme.NovaTV">
+        <item name="android:windowBackground">@drawable/bg_splash</item>
+    </style>
+
     <style name="Theme.NovaTV.Player" parent="Theme.NovaTV">
         <item name="android:windowBackground">#000000</item>
         <item name="android:windowFullscreen">true</item>

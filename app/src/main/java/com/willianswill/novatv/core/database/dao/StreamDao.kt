@@ -80,6 +80,24 @@ interface StreamDao {
     @Query(
         """
         SELECT * FROM streams
+        WHERE profileId = :profileId
+          AND (:includeAdult = 1 OR isAdult = 0)
+          AND (baseName LIKE '%' || :query || '%' OR name LIKE '%' || :query || '%')
+        GROUP BY mediaType, baseName
+        ORDER BY CASE WHEN mediaType = 'LIVE' THEN 0 ELSE 1 END ASC, name ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun searchGlobal(
+        profileId: Long,
+        query: String,
+        includeAdult: Boolean,
+        limit: Int = 50
+    ): List<StreamEntity>
+
+    @Query(
+        """
+        SELECT * FROM streams
         WHERE profileId = :profileId AND isFavorite = 1
           AND (:includeAdult = 1 OR isAdult = 0)
         ORDER BY name ASC

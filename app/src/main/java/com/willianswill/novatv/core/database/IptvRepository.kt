@@ -164,6 +164,18 @@ class IptvRepository(context: Context) {
         historyDao.upsert(entry)
     }
 
+    suspend fun searchGlobal(
+        profileId: Long,
+        query: String,
+        includeAdult: Boolean
+    ): Pair<List<StreamEntity>, List<SeriesEntity>> = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.length < 2) return@withContext emptyList<StreamEntity>() to emptyList()
+        val streams = streamDao.searchGlobal(profileId, q, includeAdult)
+        val series = seriesDao.searchGlobal(profileId, q, includeAdult)
+        streams to series
+    }
+
     suspend fun getCurrentEpg(profileId: Long, channelId: String) = withContext(Dispatchers.IO) {
         val key = channelId.trim().lowercase()
         if (key.isBlank()) return@withContext null

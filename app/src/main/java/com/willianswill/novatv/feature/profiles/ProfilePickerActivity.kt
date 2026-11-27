@@ -31,11 +31,23 @@ import com.willianswill.novatv.feature.home.HomeActivity
 
 class ProfilePickerActivity : AppCompatActivity() {
 
+    companion object {
+        const val EXTRA_FORCE_PICKER = "extra_force_picker"
+    }
+
     private lateinit var binding: ActivityProfilePickerBinding
     private var isManageMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val forcePicker = intent.getBooleanExtra(EXTRA_FORCE_PICKER, false)
+        val users = UserProfileManager.getUsers(this)
+        if (!forcePicker && users.size == 1 && users[0].pin.isBlank()) {
+            openHomeForUser(users[0])
+            return
+        }
+
         binding = ActivityProfilePickerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

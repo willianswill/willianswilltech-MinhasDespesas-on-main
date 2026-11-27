@@ -31,6 +31,7 @@ import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ActivityHomeBinding
 import com.willianswill.novatv.feature.downloads.DownloadsActivity
 import com.willianswill.novatv.feature.livetv.LiveTvActivity
+import com.willianswill.novatv.feature.search.GlobalSearchActivity
 import com.willianswill.novatv.feature.playlists.PlaylistsActivity
 import com.willianswill.novatv.feature.profiles.ProfilePickerActivity
 import com.willianswill.novatv.feature.settings.SettingsActivity
@@ -229,7 +230,7 @@ class HomeActivity : AppCompatActivity() {
         binding.cardMultiview.enableCinemaFocusZoom(1.06f)
 
         listOf(
-            binding.btnSwitchProfile, binding.btnPlaylists, binding.btnDownloads, binding.btnSettings,
+            binding.btnGlobalSearch, binding.btnSwitchProfile, binding.btnPlaylists, binding.btnDownloads, binding.btnSettings,
             binding.btnAddFirstPlaylist, binding.btnCheckMacPlaylist,
             binding.btnBannerPrev, binding.btnBannerNext
         ).forEach { btn ->
@@ -238,6 +239,9 @@ class HomeActivity : AppCompatActivity() {
         }
 
         // Navegação previsível entre a barra superior e os cards principais (sem pular para o rodapé)
+        binding.btnGlobalSearch.nextFocusDownId = com.willianswill.novatv.R.id.card_live_tv
+        binding.btnGlobalSearch.nextFocusRightId = com.willianswill.novatv.R.id.btn_switch_profile
+        binding.btnSwitchProfile.nextFocusLeftId = com.willianswill.novatv.R.id.btn_global_search
         binding.btnSwitchProfile.nextFocusDownId = com.willianswill.novatv.R.id.card_live_tv
         binding.btnPlaylists.nextFocusDownId = com.willianswill.novatv.R.id.card_movies
         binding.btnDownloads.nextFocusDownId = com.willianswill.novatv.R.id.card_series
@@ -278,8 +282,11 @@ class HomeActivity : AppCompatActivity() {
             }
         }
 
+        binding.btnGlobalSearch.setOnClickListener {
+            startActivity(Intent(this, GlobalSearchActivity::class.java))
+        }
         binding.btnSwitchProfile.setOnClickListener {
-            startActivity(Intent(this, ProfilePickerActivity::class.java))
+            startActivity(Intent(this, ProfilePickerActivity::class.java).putExtra(ProfilePickerActivity.EXTRA_FORCE_PICKER, true))
             finish()
         }
 
