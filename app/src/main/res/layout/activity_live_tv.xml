@@ -56,10 +56,10 @@
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- Mini-Player + EPG Horizontal Preview -->
+    <!-- Mini-Player + EPG Vertical Preview -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="190dp"
+        android:layout_height="225dp"
         android:layout_marginBottom="10dp"
         android:background="@drawable/selector_cinema_card"
         android:orientation="vertical"
@@ -67,8 +67,7 @@
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_height="120dp"
             android:background="#000000">
 
             <androidx.media3.ui.PlayerView
@@ -98,22 +97,29 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:maxLines="2"
             android:paddingTop="6dp"
             android:text="Selecione um canal para pré-visualizar"
             android:textColor="@color/accent_cyan"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tv_epg_timeline"
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="Guia EPG em grade disponível"
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
+            android:layout_height="0dp"
+            android:layout_marginTop="3dp"
+            android:layout_weight="1"
+            android:scrollbars="none">
+
+            <TextView
+                android:id="@+id/tv_epg_timeline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineSpacingExtra="3dp"
+                android:text="Guia EPG em grade disponível"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </ScrollView>
     </LinearLayout>
 
     <!-- Categories -->

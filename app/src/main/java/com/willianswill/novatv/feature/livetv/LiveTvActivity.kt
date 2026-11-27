@@ -47,6 +47,7 @@ class LiveTvActivity : AppCompatActivity() {
     private var searchQuery: String = ""
     private var currentPreviewStream: StreamEntity? = null
     private var pagingJob: Job? = null
+    private var epgPreviewJob: Job? = null
     private var moveFocusToFirstChannel = false
     private var autoPlayedGloboSp = false
 
@@ -106,6 +107,9 @@ class LiveTvActivity : AppCompatActivity() {
                 lifecycleScope.launch {
                     repository.toggleStreamFavorite(stream.id, !stream.isFavorite)
                 }
+            },
+            onChannelFocused = { stream ->
+                loadEpgPreview(stream)
             }
         )
         channelAdapter.addLoadStateListener { loadStates ->
@@ -213,8 +217,7 @@ class LiveTvActivity : AppCompatActivity() {
 
     private fun previewChannel(stream: StreamEntity) {
         currentPreviewStream = stream
-        binding.tvEpgNow.text = stream.baseName
-        binding.tvEpgTimeline.text = "Carregando guia de programação..."
+        loadEpgPreview(stream)
 
         miniPlayer?.release()
         val exo = NovaPlayerFactory.createPlayer(
@@ -229,25 +232,36 @@ class LiveTvActivity : AppCompatActivity() {
         exo.prepare()
         exo.playWhenReady = true
         miniPlayer = exo
+    }
 
-        lifecycleScope.launch {
+    private fun loadEpgPreview(stream: StreamEntity) {
+        epgPreviewJob?.cancel()
+        binding.tvEpgNow.text = "📺 ${stream.baseName}"
+        binding.tvEpgTimeline.text = "Carregando programação..."
+
+        epgPreviewJob = lifecycleScope.launch {
             if (stream.epgChannelId.isBlank()) {
-                binding.tvEpgTimeline.text = "${stream.categoryName} • Toque novamente para Tela Cheia"
+                binding.tvEpgTimeline.text = "${stream.categoryName}\nSem guia EPG vinculado • Clique OK para assistir"
                 return@launch
             }
             val now = System.currentTimeMillis()
-            val windowEnd = now + (6L * 60L * 60L * 1000L)
+            val windowEnd = now + (8L * 60L * 60L * 1000L)
             val programs = repository.getEpgInRange(activeProfileId, stream.epgChannelId, now, windowEnd)
             if (programs.isEmpty()) {
-                binding.tvEpgTimeline.text = "${stream.categoryName} • Sem EPG disponível"
+                binding.tvEpgTimeline.text = "${stream.categoryName}\nSem EPG disponível no momento"
             } else {
                 val fmt = SimpleDateFormat("HH:mm", Locale.getDefault())
                 val current = programs.firstOrNull { it.startMs <= now && it.endMs > now }
                 if (current != null) {
-                    binding.tvEpgNow.text = "${stream.name} • ${current.title}"
+                    val curTime = "${fmt.format(Date(current.startMs))}–${fmt.format(Date(current.endMs))}"
+                    binding.tvEpgNow.text = "▶ ${stream.baseName} • $curTime\n${current.title}"
+                } else {
+                    binding.tvEpgNow.text = "📺 ${stream.baseName}"
                 }
-                binding.tvEpgTimeline.text = programs.take(4).joinToString("  |  ") {
-                    "${fmt.format(Date(it.startMs))} ${it.title}"
+                binding.tvEpgTimeline.text = programs.take(6).joinToString("\n") { p ->
+                    val isNow = p.startMs <= now && p.endMs > now
+                    val icon = if (isNow) "●" else "○"
+                    "$icon ${fmt.format(Date(p.startMs))}–${fmt.format(Date(p.endMs))}  ${p.title}"
                 }
             }
         }

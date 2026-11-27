@@ -116,20 +116,29 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
+                android:ellipsize="end"
+                android:maxLines="2"
                 android:text="Selecione um canal"
                 android:textColor="@color/accent_cyan"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tv_epg_timeline"
+            <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_marginTop="6dp"
                 android:layout_weight="1"
-                android:text="Programação EPG aparecerá aqui."
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
+                android:scrollbars="none">
+
+                <TextView
+                    android:id="@+id/tv_epg_timeline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="5dp"
+                    android:text="Programação EPG aparecerá aqui."
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+            </ScrollView>
         </LinearLayout>
     </LinearLayout>
 

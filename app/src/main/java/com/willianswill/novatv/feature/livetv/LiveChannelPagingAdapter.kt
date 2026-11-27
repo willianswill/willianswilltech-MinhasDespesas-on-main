@@ -23,7 +23,8 @@ class LiveChannelPagingAdapter(
     private val scope: CoroutineScope,
     private val lookupEpg: suspend (Long, String) -> EpgProgramEntity?,
     private val onPreviewOrPlay: (StreamEntity, Int) -> Unit,
-    private val onToggleFav: (StreamEntity) -> Unit
+    private val onToggleFav: (StreamEntity) -> Unit,
+    private val onChannelFocused: (StreamEntity) -> Unit = {}
 ) : PagingDataAdapter<StreamEntity, LiveChannelPagingAdapter.VH>(DiffCallback) {
 
     private val epgCache = ConcurrentHashMap<String, EpgProgramEntity>()
@@ -82,6 +83,9 @@ class LiveChannelPagingAdapter(
                 }
             }
 
+            binding.root.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) onChannelFocused(item)
+            }
             binding.root.setOnClickListener { onPreviewOrPlay(item, pos) }
             binding.btnFav.setOnClickListener { onToggleFav(item) }
         }
