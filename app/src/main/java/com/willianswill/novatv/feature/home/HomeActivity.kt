@@ -29,6 +29,7 @@ import com.willianswill.novatv.core.player.PlayerActivity
 import com.willianswill.novatv.core.player.UserProfileManager
 import com.willianswill.novatv.core.ui.enableCinemaFocusZoom
 import com.willianswill.novatv.databinding.ActivityHomeBinding
+import com.willianswill.novatv.feature.downloads.DownloadsActivity
 import com.willianswill.novatv.feature.livetv.LiveTvActivity
 import com.willianswill.novatv.feature.playlists.PlaylistsActivity
 import com.willianswill.novatv.feature.profiles.ProfilePickerActivity
@@ -228,7 +229,7 @@ class HomeActivity : AppCompatActivity() {
         binding.cardMultiview.enableCinemaFocusZoom(1.06f)
 
         listOf(
-            binding.btnSwitchProfile, binding.btnPlaylists, binding.btnSettings,
+            binding.btnSwitchProfile, binding.btnPlaylists, binding.btnDownloads, binding.btnSettings,
             binding.btnAddFirstPlaylist, binding.btnCheckMacPlaylist,
             binding.btnBannerPrev, binding.btnBannerNext
         ).forEach { btn ->
@@ -239,11 +240,14 @@ class HomeActivity : AppCompatActivity() {
         // Navegação previsível entre a barra superior e os cards principais (sem pular para o rodapé)
         binding.btnSwitchProfile.nextFocusDownId = com.willianswill.novatv.R.id.card_live_tv
         binding.btnPlaylists.nextFocusDownId = com.willianswill.novatv.R.id.card_movies
-        binding.btnSettings.nextFocusDownId = com.willianswill.novatv.R.id.card_series
+        binding.btnDownloads.nextFocusDownId = com.willianswill.novatv.R.id.card_series
+        binding.btnSettings.nextFocusDownId = com.willianswill.novatv.R.id.card_multiview
         binding.btnSwitchProfile.nextFocusRightId = com.willianswill.novatv.R.id.btn_playlists
         binding.btnPlaylists.nextFocusLeftId = com.willianswill.novatv.R.id.btn_switch_profile
-        binding.btnPlaylists.nextFocusRightId = com.willianswill.novatv.R.id.btn_settings
-        binding.btnSettings.nextFocusLeftId = com.willianswill.novatv.R.id.btn_playlists
+        binding.btnPlaylists.nextFocusRightId = com.willianswill.novatv.R.id.btn_downloads
+        binding.btnDownloads.nextFocusLeftId = com.willianswill.novatv.R.id.btn_playlists
+        binding.btnDownloads.nextFocusRightId = com.willianswill.novatv.R.id.btn_settings
+        binding.btnSettings.nextFocusLeftId = com.willianswill.novatv.R.id.btn_downloads
 
         binding.cardLiveTv.nextFocusUpId = com.willianswill.novatv.R.id.btn_switch_profile
         binding.cardMovies.nextFocusUpId = com.willianswill.novatv.R.id.btn_playlists
@@ -284,6 +288,9 @@ class HomeActivity : AppCompatActivity() {
         }
         binding.btnAddFirstPlaylist.setOnClickListener {
             startActivity(Intent(this, PlaylistsActivity::class.java))
+        }
+        binding.btnDownloads.setOnClickListener {
+            startActivity(Intent(this, DownloadsActivity::class.java))
         }
         binding.btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))

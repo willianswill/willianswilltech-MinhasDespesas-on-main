@@ -14,7 +14,8 @@ data class EpisodeUiEntry(
 
 class EpisodeProgressAdapter(
     private val items: List<EpisodeUiEntry>,
-    private val onSelect: (Int) -> Unit
+    private val onSelect: (Int) -> Unit,
+    private val onLongSelect: (Int) -> Unit = {}
 ) : RecyclerView.Adapter<EpisodeProgressAdapter.VH>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -39,6 +40,10 @@ class EpisodeProgressAdapter(
         }
 
         holder.binding.root.setOnClickListener { onSelect(position) }
+        holder.binding.root.setOnLongClickListener {
+            onLongSelect(position)
+            true
+        }
     }
 
     override fun getItemCount(): Int = items.size

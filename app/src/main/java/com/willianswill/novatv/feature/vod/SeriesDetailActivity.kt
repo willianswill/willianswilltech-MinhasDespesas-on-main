@@ -17,6 +17,8 @@ import com.willianswill.novatv.R
 import com.willianswill.novatv.core.database.IptvRepository
 import com.willianswill.novatv.core.database.entity.MediaType
 import com.willianswill.novatv.core.database.entity.ProfileType
+import com.willianswill.novatv.core.downloads.DownloadStatus
+import com.willianswill.novatv.core.downloads.OfflineDownloadManager
 import com.willianswill.novatv.core.network.XtreamApiClient
 import com.willianswill.novatv.core.player.PlayableItem
 import com.willianswill.novatv.core.player.PlayerActivity
@@ -217,12 +219,46 @@ class SeriesDetailActivity : AppCompatActivity() {
 
     private fun renderSeasonEpisodes(season: Int) {
         val list = episodesBySeason[season].orEmpty()
-        binding.rvEpisodes.adapter = EpisodeProgressAdapter(list) { idxInSeason ->
-            val clicked = list[idxInSeason]
-            val globalIdx = allEntriesOrdered.indexOfFirst { it.playable.contentKey == clicked.playable.contentKey }
-                .coerceAtLeast(0)
-            launchWithResumeChoice(allEntriesOrdered.map { it.playable }, globalIdx)
-        }
+        binding.rvEpisodes.adapter = EpisodeProgressAdapter(
+            items = list,
+            onSelect = { idxInSeason ->
+                val clicked = list[idxInSeason]
+                val globalIdx = allEntriesOrdered.indexOfFirst { it.playable.contentKey == clicked.playable.contentKey }
+                    .coerceAtLeast(0)
+                launchWithResumeChoice(allEntriesOrdered.map { it.playable }, globalIdx)
+            },
+            onLongSelect = { idxInSeason ->
+                val clicked = list[idxInSeason].playable
+                val existing = OfflineDownloadManager.findByUrl(this, clicked.streamUrl)
+                when (existing?.status) {
+                    DownloadStatus.COMPLETED -> {
+                        AlertDialog.Builder(this)
+                            .setTitle(clicked.title)
+                            .setMessage("Este episódio já está baixado para assistir offline.")
+                            .setPositiveButton("▶ Assistir Offline") { _, _ -> openPlayer(listOf(clicked), 0) }
+                            .setNegativeButton("🗑 Excluir Download") { _, _ ->
+                                OfflineDownloadManager.deleteDownload(this, existing.id)
+                                Toast.makeText(this, "Download removido.", Toast.LENGTH_SHORT).show()
+                            }
+                            .show()
+                    }
+                    DownloadStatus.DOWNLOADING, DownloadStatus.QUEUED -> {
+                        Toast.makeText(this, "Episódio já está baixando (veja em ⬇ Offline).", Toast.LENGTH_SHORT).show()
+                    }
+                    else -> {
+                        AlertDialog.Builder(this)
+                            .setTitle(clicked.title)
+                            .setMessage("Deseja baixar este episódio para assistir offline?")
+                            .setPositiveButton("⬇ Baixar Offline") { _, _ ->
+                                OfflineDownloadManager.enqueueDownload(this, clicked)
+                                Toast.makeText(this, "⬇ Baixando ${clicked.title}...", Toast.LENGTH_LONG).show()
+                            }
+                            .setNegativeButton("Cancelar", null)
+                            .show()
+                    }
+                }
+            }
+        )
     }
 
     private fun launchWithResumeChoice(list: List<PlayableItem>, idx: Int) {
@@ -246,9 +282,15 @@ class SeriesDetailActivity : AppCompatActivity() {
     }
 
     private fun openPlayer(list: List<PlayableItem>, idx: Int) {
+        val adjusted = list.mapIndexed { i, item ->
+            if (i == idx) {
+                val localUri = OfflineDownloadManager.findCompletedLocalUri(this, item.streamUrl)
+                if (localUri != null) item.copy(streamUrl = localUri) else item
+            } else item
+        }
         startActivity(
             Intent(this, PlayerActivity::class.java).apply {
-                putExtra(PlayerActivity.EXTRA_ITEMS, ArrayList(list))
+                putExtra(PlayerActivity.EXTRA_ITEMS, ArrayList(adjusted))
                 putExtra(PlayerActivity.EXTRA_INDEX, idx)
             }
         )

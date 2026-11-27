@@ -20,6 +20,8 @@ import com.willianswill.novatv.core.database.entity.ProfileEntity
 import com.willianswill.novatv.core.database.entity.ProfileType
 import com.willianswill.novatv.core.database.entity.SeriesEntity
 import com.willianswill.novatv.core.database.entity.StreamEntity
+import com.willianswill.novatv.core.downloads.DownloadStatus
+import com.willianswill.novatv.core.downloads.OfflineDownloadManager
 import com.willianswill.novatv.core.network.XtreamApiClient
 import com.willianswill.novatv.core.player.AppPreferences
 import com.willianswill.novatv.core.player.PlayableItem
@@ -253,15 +255,57 @@ class VodCatalogActivity : AppCompatActivity() {
                 isFavorite = movie.isFavorite
             )
 
+            val existingDl = OfflineDownloadManager.findByUrl(this@VodCatalogActivity, movie.streamUrl)
+            val dlLabel = when (existingDl?.status) {
+                DownloadStatus.COMPLETED -> "✓ Offline (Excluir)"
+                DownloadStatus.DOWNLOADING, DownloadStatus.QUEUED -> "⏳ Baixando..."
+                else -> "⬇ Baixar Offline"
+            }
+
+            val favBtn = android.widget.Button(this@VodCatalogActivity).apply {
+                text = favLabel
+                isFocusable = true
+                setOnClickListener {
+                    lifecycleScope.launch {
+                        repository.toggleStreamFavorite(movie.id, !movie.isFavorite)
+                        Toast.makeText(
+                            this@VodCatalogActivity,
+                            if (!movie.isFavorite) "★ Adicionado aos Favoritos" else "☆ Removido dos Favoritos",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+            val msgView = android.widget.TextView(this@VodCatalogActivity).apply {
+                text = info
+                setPadding(48, 24, 48, 12)
+                textSize = 14f
+            }
+            val container = android.widget.LinearLayout(this@VodCatalogActivity).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                addView(msgView)
+                addView(favBtn)
+            }
+
             val dialog = AlertDialog.Builder(this@VodCatalogActivity)
                 .setTitle(movie.name)
-                .setMessage(info)
+                .setView(container)
                 .setPositiveButton("▶ Assistir") { _, _ ->
                     launchWithResumeChoice(listOf(baseItem), 0)
                 }
-                .setNeutralButton(favLabel) { _, _ ->
-                    lifecycleScope.launch {
-                        repository.toggleStreamFavorite(movie.id, !movie.isFavorite)
+                .setNeutralButton(dlLabel) { _, _ ->
+                    when (existingDl?.status) {
+                        DownloadStatus.COMPLETED -> {
+                            OfflineDownloadManager.deleteDownload(this@VodCatalogActivity, existingDl.id)
+                            Toast.makeText(this@VodCatalogActivity, "Download removido.", Toast.LENGTH_SHORT).show()
+                        }
+                        DownloadStatus.DOWNLOADING, DownloadStatus.QUEUED -> {
+                            Toast.makeText(this@VodCatalogActivity, "Download em andamento (veja em ⬇ Offline).", Toast.LENGTH_SHORT).show()
+                        }
+                        else -> {
+                            OfflineDownloadManager.enqueueDownload(this@VodCatalogActivity, baseItem)
+                            Toast.makeText(this@VodCatalogActivity, "⬇ Baixando ${movie.name} em segundo plano...", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
                 .setNegativeButton("Fechar", null)
@@ -417,9 +461,15 @@ class VodCatalogActivity : AppCompatActivity() {
     }
 
     private fun openPlayer(list: List<PlayableItem>, idx: Int) {
+        val adjusted = list.mapIndexed { i, item ->
+            if (i == idx) {
+                val localUri = OfflineDownloadManager.findCompletedLocalUri(this, item.streamUrl)
+                if (localUri != null) item.copy(streamUrl = localUri) else item
+            } else item
+        }
         startActivity(
             Intent(this, PlayerActivity::class.java).apply {
-                putExtra(PlayerActivity.EXTRA_ITEMS, ArrayList(list))
+                putExtra(PlayerActivity.EXTRA_ITEMS, ArrayList(adjusted))
                 putExtra(PlayerActivity.EXTRA_INDEX, idx)
             }
         )
