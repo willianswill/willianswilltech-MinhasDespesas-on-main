@@ -167,6 +167,7 @@ class IptvRepository(context: Context) {
             val key = channelId.trim().lowercase()
             if (key.isBlank()) return@withContext emptyList()
             epgDao.getProgramsInRange(profileId, key, fromMs, toMs)
+                .distinctBy { it.startMs to it.title.trim() }
         }
 
     suspend fun getChannelVariants(stream: StreamEntity): List<StreamEntity> =
@@ -423,10 +424,8 @@ class IptvRepository(context: Context) {
 
     suspend fun syncEpgForProfile(profile: ProfileEntity): Int = withContext(Dispatchers.IO) {
         if (profile.epgUrl.isBlank()) return@withContext 0
-        val cutoff = System.currentTimeMillis() - (24L * 60L * 60L * 1000L)
-        epgDao.deleteExpired(profile.id, cutoff)
-
         xtreamClient.openStream(profile.epgUrl, profile.userAgent).use { stream ->
+            epgDao.deleteByProfile(profile.id)
             StreamingXmltvParser.parseInChunks(profile.id, stream) { chunk ->
                 epgDao.insertAll(chunk)
             }
