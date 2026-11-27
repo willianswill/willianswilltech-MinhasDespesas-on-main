@@ -13,6 +13,11 @@ class CategoryTabAdapter(
     private var items: List<CategoryEntity?> = emptyList() // null = Todos, categoryId="__FAV__" = Favoritos
     private var selectedKey: String? = null
 
+    fun setSelectedCategory(categoryId: String?) {
+        selectedKey = categoryId
+        notifyDataSetChanged()
+    }
+
     fun submitCategories(list: List<CategoryEntity>, includeFavoritesTab: Boolean = true) {
         val full = mutableListOf<CategoryEntity?>(null)
         if (includeFavoritesTab) {

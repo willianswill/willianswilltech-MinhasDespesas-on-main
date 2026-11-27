@@ -54,6 +54,7 @@ class VodCatalogActivity : AppCompatActivity() {
     private var onlyFavorites: Boolean = false
     private var searchQuery: String = ""
     private var pagingJob: Job? = null
+    private var autoSelectedLaunchCategory = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -174,6 +175,24 @@ class VodCatalogActivity : AppCompatActivity() {
                 launch {
                     repository.observeCategories(profile.id, mode, prefs.showAdultContent).collectLatest { cats ->
                         categoryAdapter.submitCategories(cats)
+                        if (mode == MediaType.MOVIE && !autoSelectedLaunchCategory && cats.isNotEmpty()) {
+                            autoSelectedLaunchCategory = true
+                            val launchIdx = cats.indexOfFirst { c ->
+                                val n = c.name.lowercase(Locale.getDefault())
+                                n.contains("lançamento") || n.contains("lancamento") || n.contains("lancamentos")
+                            }.takeIf { it >= 0 } ?: cats.indexOfFirst { c ->
+                                val n = c.name.lowercase(Locale.getDefault())
+                                n.contains("novidade") || n.contains("2025") || n.contains("2026")
+                            }
+                            if (launchIdx >= 0) {
+                                val launchCat = cats[launchIdx]
+                                selectedCategoryId = launchCat.categoryId
+                                onlyFavorites = false
+                                categoryAdapter.setSelectedCategory(launchCat.categoryId)
+                                binding.rvCategories.scrollToPosition(launchIdx + 2)
+                                loadPagedCatalog()
+                            }
+                        }
                     }
                 }
                 loadPagedCatalog()
