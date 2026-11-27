@@ -77,6 +77,8 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
     private var isAutoQuality = true
     private var rebufferCountInWindow = 0
     private var lastReadyAtMs = 0L
+    private val failedVariantUrls = HashSet<String>()
+    private val stallWatchdogRunnable = Runnable { onPlaybackStalled() }
     private var overlayAdapter: PlayerChannelOverlayAdapter? = null
     private val hideGestureRunnable = Runnable { binding.tvGestureFeedback.visibility = View.GONE }
     private var pendingSeekTargetMs = -1L
@@ -390,6 +392,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         externalSubUri = null
         currentVariant = null
         activeVariants = emptyList()
+        failedVariantUrls.clear()
         binding.btnNextEpisode.visibility = View.GONE
         binding.btnRecall.visibility = if (previousIndex in items.indices) View.VISIBLE else View.GONE
         startPlayback(isRetry = false)
@@ -442,14 +445,19 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
                 when (playbackState) {
                     Player.STATE_BUFFERING -> {
                         showLoading("Buffering...")
+                        if (!isVod && overrideCatchupUrl == null) {
+                            handler.removeCallbacks(stallWatchdogRunnable)
+                            handler.postDelayed(stallWatchdogRunnable, 4_500L)
+                        }
                         if (lastReadyAtMs > 0L && System.currentTimeMillis() - lastReadyAtMs < 20_000L) {
                             rebufferCountInWindow++
                             if (rebufferCountInWindow >= 2 && isAutoQuality && activeVariants.size > 1) {
-                                tryAdaptiveDowngrade()
+                                trySwitchToAnotherSource("Rede instável")
                             }
                         }
                     }
                     Player.STATE_READY -> {
+                        handler.removeCallbacks(stallWatchdogRunnable)
                         retryCount = 0
                         seekLockUntilMs = 0L
                         lastReadyAtMs = System.currentTimeMillis()
@@ -477,8 +485,9 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                handler.removeCallbacks(stallWatchdogRunnable)
                 val reason = extractErrorReason(error)
-                if (isAutoQuality && activeVariants.size > 1 && tryAdaptiveDowngrade()) {
+                if (activeVariants.size > 1 && trySwitchToAnotherSource("Fonte falhou")) {
                     return
                 }
                 if (prefs.autoReconnect) {
@@ -546,7 +555,11 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         releasePlayer()
         if (retryCount < MAX_RETRY) {
             retryCount++
-            val delay = (retryCount * 1500L).coerceAtMost(6000L)
+            val delay = when (retryCount) {
+                1 -> 300L
+                2 -> 1000L
+                else -> 2000L
+            }
             val detail = if (reason.isNotBlank()) " [$reason]" else ""
             showLoading("Sinal instável$detail. Reconectando ($retryCount/$MAX_RETRY)...")
             handler.removeCallbacks(retryRunnable)
@@ -556,6 +569,16 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
             val detail = if (reason.isNotBlank()) " ($reason)" else ""
             Toast.makeText(this, "Não foi possível conectar ao canal$detail.", Toast.LENGTH_LONG).show()
             showControls()
+        }
+    }
+
+    private fun onPlaybackStalled() {
+        if (isVodPlayback() || overrideCatchupUrl != null) return
+        if (activeVariants.size > 1 && trySwitchToAnotherSource("Canal travou")) {
+            return
+        }
+        if (prefs.autoReconnect) {
+            scheduleRetry("Sinal travado")
         }
     }
 
@@ -581,12 +604,23 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
         return variants.firstOrNull { it.rank <= targetMaxRank } ?: variants.last()
     }
 
-    private fun tryAdaptiveDowngrade(): Boolean {
+    private fun trySwitchToAnotherSource(reasonPrefix: String = "Rede lenta"): Boolean {
         val cur = currentVariant ?: return false
-        val lower = activeVariants.firstOrNull { it.rank < cur.rank } ?: return false
+        if (activeVariants.size <= 1) return false
+        failedVariantUrls.add(cur.streamUrl)
+
+        var candidates = activeVariants.filter { it.streamUrl != cur.streamUrl && !failedVariantUrls.contains(it.streamUrl) }
+        if (candidates.isEmpty()) {
+            failedVariantUrls.clear()
+            failedVariantUrls.add(cur.streamUrl)
+            candidates = activeVariants.filter { it.streamUrl != cur.streamUrl }
+        }
+        val next = candidates.firstOrNull { it.rank <= cur.rank } ?: candidates.firstOrNull() ?: return false
+
         rebufferCountInWindow = 0
-        currentVariant = lower
-        Toast.makeText(this, "⚡ Rede lenta: ajustando para ${lower.label}", Toast.LENGTH_SHORT).show()
+        retryCount = 0
+        currentVariant = next
+        Toast.makeText(this, "⚡ $reasonPrefix: trocando para ${next.label}", Toast.LENGTH_SHORT).show()
         startPlayback(isRetry = false)
         return true
     }
@@ -1126,6 +1160,7 @@ class PlayerActivity : AppCompatActivity(), TelemetryManager.PlaybackStopper {
     }
 
     private fun releasePlayer() {
+        handler.removeCallbacks(stallWatchdogRunnable)
         handler.removeCallbacks(progressRunnable)
         player?.release()
         player = null

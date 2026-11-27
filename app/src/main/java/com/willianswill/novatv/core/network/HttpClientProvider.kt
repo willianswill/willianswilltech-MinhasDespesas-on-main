@@ -97,6 +97,15 @@ object HttpClientProvider {
         builder.build()
     }
 
+    // Cliente rápido dedicado para streams ao vivo/player: falha em 10s se travar para trocar de fonte rápido
+    val playerClient: OkHttpClient by lazy {
+        sharedClient.newBuilder()
+            .connectTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
+
     // Cliente dedicado para capas/pôsteres (TMDB, Cloudflare, painéis IPTV) com User-Agent de navegador
     val imageClient: OkHttpClient by lazy {
         sharedClient.newBuilder()

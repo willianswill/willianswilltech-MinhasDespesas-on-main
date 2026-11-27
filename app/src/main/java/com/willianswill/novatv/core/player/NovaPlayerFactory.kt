@@ -52,7 +52,7 @@ object NovaPlayerFactory {
             ?: AppPreferences(context).customUserAgent
         referrer?.takeIf { it.isNotBlank() }?.let { headers["Referer"] = it }
 
-        val dataSourceFactory = OkHttpDataSource.Factory(HttpClientProvider.sharedClient)
+        val dataSourceFactory = OkHttpDataSource.Factory(HttpClientProvider.playerClient)
             .setUserAgent(ua)
             .setDefaultRequestProperties(headers)
 
